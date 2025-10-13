@@ -73,11 +73,92 @@ When enabled, the server will:
 
 ## Docker
 
-Build and run with Docker:
+### Building the Image
+
+Build the Docker image:
 
 ```bash
 docker build -t deadmannotifier .
-docker run -p 3000:3000 -v $(pwd)/config.yaml:/app/config.yaml deadmannotifier
+```
+
+Or use the provided Makefile:
+
+```bash
+make docker-build
+```
+
+### Running with Docker
+
+Run the container with volume mounts for configuration and data persistence:
+
+```bash
+docker run -d \
+  --name deadman-notifier \
+  -p 3000:3000 \
+  -v $(pwd)/data:/app/data \
+  deadmannotifier
+```
+
+Or use the Makefile:
+
+```bash
+make docker-run
+```
+
+### Docker Compose
+
+For easier management, use Docker Compose. You can use the provided docker-compose.yml
+file as an example to start the service.
+
+Start with Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+Stop the services:
+
+```bash
+docker-compose down
+```
+
+### Using Pre-built Images
+
+You can also use pre-built images from GitHub Container Registry:
+
+```yaml
+version: "3.8"
+
+services:
+  deadman-notifier:
+    image: ghcr.io/your-username/deadmannotifier:latest
+    container_name: deadman-notifier
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+```
+
+### Docker Management Commands
+
+The Makefile provides convenient Docker management commands:
+
+```bash
+make docker-build          # Build the image
+make docker-run            # Run the container
+make docker-run-interactive # Run interactively
+make docker-stop           # Stop the container
+make docker-start          # Start the container
+make docker-remove         # Remove the container
+make docker-logs           # Show container logs
+make docker-shell          # Open shell in container
+make docker-clean          # Stop and remove container
+make docker-clean-all      # Remove container and image
+make docker-list           # List service status
 ```
 
 ## Testing

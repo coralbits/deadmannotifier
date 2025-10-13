@@ -1,0 +1,11 @@
+services:
+  deadman-notifier:
+    build: .
+    container_name: deadman-notifier
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

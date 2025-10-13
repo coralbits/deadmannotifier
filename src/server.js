@@ -27,11 +27,59 @@ class Server {
     this.app.use(express.text({ type: "*/*" }));
     this.app.use(express.json());
 
+    // Request logging middleware
+    this.app.use(this.requestLogger);
+
     // Setup routes
     this.setupRoutes();
 
     // Error handling middleware
     this.app.use(this.errorHandler);
+  }
+
+  requestLogger(req, res, next) {
+    const start = Date.now();
+    const timestamp = new Date().toISOString();
+
+    // Get client IP (considering proxies)
+    const clientIp =
+      req.ip ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+      "unknown";
+
+    // Get user agent
+    const userAgent = req.get("User-Agent") || "unknown";
+
+    // Log the request
+    console.log(
+      `[${timestamp}] ${req.method} ${req.originalUrl} - ${clientIp} - ${userAgent}`
+    );
+
+    // Override res.end to log response
+    const originalEnd = res.end;
+    res.end = function (chunk, encoding) {
+      const duration = Date.now() - start;
+      const statusCode = res.statusCode;
+      const statusColor =
+        statusCode >= 500
+          ? "\x1b[31m" // red for 5xx
+          : statusCode >= 400
+          ? "\x1b[33m" // yellow for 4xx
+          : statusCode >= 300
+          ? "\x1b[36m" // cyan for 3xx
+          : "\x1b[32m"; // green for 2xx
+      const resetColor = "\x1b[0m";
+
+      console.log(
+        `${statusColor}[${timestamp}] ${req.method} ${req.originalUrl} - ${statusCode} - ${duration}ms${resetColor}`
+      );
+
+      originalEnd.call(this, chunk, encoding);
+    };
+
+    next();
   }
 
   setupRoutes() {

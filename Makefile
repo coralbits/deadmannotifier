@@ -57,7 +57,7 @@ lint: ## Run linting (if configured)
 docker-build: ## Build Docker image
 	@echo "$(YELLOW)Building Docker image $(IMAGE_NAME):$(IMAGE_TAG)...$(NC)"
 	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
-	@echo "$(GREEN)Docker image built successfully!$(NC)"
+	@echo "$(GREEN)Docker image $(IMAGE_NAME):$(IMAGE_TAG) built successfully!$(NC)"
 
 .PHONY: docker-run
 docker-run: ## Run Docker container

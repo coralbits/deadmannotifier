@@ -132,8 +132,7 @@ class CronService {
     // Write email to temporary file
     const fs = require("fs");
     const path = require("path");
-    const os = require("os");
-    const tempDir = os.tmpdir();
+    const tempDir = process.env.TMPDIR || "/tmp";
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const tempFile = path.join(tempDir, `deadman-test-email-${timestamp}.html`);
 

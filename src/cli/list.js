@@ -52,7 +52,7 @@ async function listCommand(options) {
             )} | ${timestamp} | ${url}`
           );
         } else {
-          const url = `${baseUrl}/${service.id}/{state}`;
+          const url = `${baseUrl}/${service.id}/ok`;
           console.log(
             `${serviceName.padEnd(20)} | MISSING | No status reported | ${url}`
           );

@@ -89,6 +89,8 @@ make docker-build
 
 ### Running with Docker
 
+Image is available at: ghcr.io/coralbits/deadmannotifier:latest
+
 Run the container with volume mounts for configuration and data persistence:
 
 ```bash
@@ -96,7 +98,7 @@ docker run -d \
   --name deadman-notifier \
   -p 3000:3000 \
   -v $(pwd)/data:/app/data \
-  deadmannotifier
+  ghcr.io/coralbits/deadmannotifier:latest
 ```
 
 Or use the Makefile:

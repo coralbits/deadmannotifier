@@ -48,7 +48,12 @@ describe("Server Integration Tests", () => {
       fs.unlinkSync(testDbPath);
     }
 
-    server = new Server(testConfigPath);
+    // Create ConfigLoader instance
+    const ConfigLoader = require("../../src/services/config");
+    const configLoader = new ConfigLoader(testConfigPath);
+    configLoader.load();
+
+    server = new Server(configLoader);
     await server.init();
     app = server.app;
   });

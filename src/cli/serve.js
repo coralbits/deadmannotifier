@@ -1,16 +1,15 @@
 const Server = require("../server");
 
 async function serveCommand(options) {
-  const { port, host, config, withCron } = options;
+  const { port, host, configLoader, withCron } = options;
 
   try {
     console.log(`Starting Dead Man Notifier server...`);
-    console.log(`Config: ${config}`);
     console.log(`Host: ${host || "from config"}`);
     console.log(`Port: ${port || "from config"}`);
     console.log(`With Cron: ${withCron ? "enabled" : "disabled"}`);
 
-    const server = new Server(config);
+    const server = new Server(configLoader);
 
     // Handle graceful shutdown
     process.on("SIGINT", async () => {

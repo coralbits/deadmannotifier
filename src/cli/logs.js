@@ -1,13 +1,9 @@
 const Database = require("../db/database");
-const ConfigLoader = require("../services/config");
 
 async function logsCommand(options) {
-  const { config, limit } = options;
+  const { configLoader, limit } = options;
 
   try {
-    // Load configuration
-    const configLoader = new ConfigLoader(config);
-    configLoader.load();
 
     // Initialize database
     const dbPath = configLoader.getDatabaseConfig().path;

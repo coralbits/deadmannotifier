@@ -3,17 +3,17 @@ const { execSync } = require("child_process");
 const path = require("path");
 
 async function cronCommand(options) {
-  const { config, init } = options;
+  const { configLoader, init } = options;
 
   if (init) {
-    await initCronEntry(config);
+    await initCronEntry(configLoader);
     return;
   }
 
   try {
     console.log("Checking if cron job should run...");
 
-    const cronService = new CronService(config);
+    const cronService = new CronService(configLoader);
     await cronService.init();
 
     // Check if we should run the cron job and run it if needed
@@ -27,15 +27,12 @@ async function cronCommand(options) {
   }
 }
 
-async function initCronEntry(configPath) {
+async function initCronEntry(configLoader) {
   try {
-    const configPathResolved = path.resolve(configPath);
+    const configPathResolved = configLoader.configPath;
     const scriptPath = path.resolve(__dirname, "../../src/index.js");
 
     // Get the cron expression from config
-    const ConfigLoader = require("../services/config");
-    const configLoader = new ConfigLoader(configPathResolved);
-    configLoader.load();
     const cronExpression = configLoader.getCronConfig();
 
     // Create cron entry - run every minute to check if we should send email

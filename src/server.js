@@ -4,9 +4,8 @@ const ConfigLoader = require("./services/config");
 const CronService = require("./services/cron");
 
 class Server {
-  constructor(configPath = "config.yaml", dbPath = "deadman.db") {
-    this.configPath = configPath;
-    this.dbPath = dbPath;
+  constructor(configLoader) {
+    this.configLoader = configLoader;
     this.app = express();
     this.db = null;
     this.config = null;
@@ -14,13 +13,11 @@ class Server {
   }
 
   async init() {
-    // Load configuration
-    const configLoader = new ConfigLoader(this.configPath);
-    this.config = configLoader.load();
-    this.configLoader = configLoader; // Store the loader instance for method access
+    // Use the passed configLoader
+    this.config = this.configLoader.load();
 
-    // Get database path from config if not provided
-    const dbPath = this.dbPath || this.configLoader.getDatabaseConfig().path;
+    // Get database path from config
+    const dbPath = this.configLoader.getDatabaseConfig().path;
 
     // Initialize database
     this.db = new Database(dbPath);
@@ -101,7 +98,7 @@ class Server {
       const serverConfig = this.configLoader.getServerConfig();
       if (serverConfig.with_cron) {
         console.log("Starting embedded cron service...");
-        this.cronService = new CronService(this.configPath, this.dbPath);
+        this.cronService = new CronService(this.configLoader);
         await this.cronService.init();
         this.cronService.start();
         console.log("Embedded cron service started");

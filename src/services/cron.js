@@ -4,9 +4,8 @@ const EmailService = require("./email");
 const ConfigLoader = require("./config");
 
 class CronService {
-  constructor(configPath = "config.yaml", dbPath = "deadman.db") {
-    this.configPath = configPath;
-    this.dbPath = dbPath;
+  constructor(configLoader) {
+    this.configLoader = configLoader;
     this.db = null;
     this.emailService = null;
     this.config = null;
@@ -14,13 +13,11 @@ class CronService {
   }
 
   async init() {
-    // Load configuration
-    const configLoader = new ConfigLoader(this.configPath);
-    this.config = configLoader.load();
-    this.configLoader = configLoader; // Store the loader instance for method access
+    // Use the passed configLoader
+    this.config = this.configLoader.load();
 
-    // Get database path from config if not provided
-    const dbPath = this.dbPath || this.configLoader.getDatabaseConfig().path;
+    // Get database path from config
+    const dbPath = this.configLoader.getDatabaseConfig().path;
 
     // Initialize database
     this.db = new Database(dbPath);

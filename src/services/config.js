@@ -41,13 +41,12 @@ class ConfigLoader {
     }
 
     // Validate port is a number
-    if (
-      typeof this.config.server.port !== "number" ||
-      this.config.server.port < 1 ||
-      this.config.server.port > 65535
-    ) {
+    const port = parseInt(this.config.server.port);
+    if (isNaN(port) || port < 1 || port > 65535) {
       throw new Error("Server port must be a number between 1 and 65535");
     }
+    // Convert port to number if it was parsed as string
+    this.config.server.port = port;
 
     // Validate with_cron is boolean if present
     if (

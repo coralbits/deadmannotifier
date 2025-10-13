@@ -72,7 +72,7 @@ describe("ConfigLoader", () => {
     });
 
     it("should throw error for missing server config", () => {
-      const invalidConfig = { ...validConfig };
+      const invalidConfig = JSON.parse(JSON.stringify(validConfig));
       delete invalidConfig.server;
 
       const yaml = require("js-yaml");
@@ -86,7 +86,7 @@ describe("ConfigLoader", () => {
     });
 
     it("should throw error for missing database config", () => {
-      const invalidConfig = { ...validConfig };
+      const invalidConfig = JSON.parse(JSON.stringify(validConfig));
       delete invalidConfig.database;
 
       const yaml = require("js-yaml");
@@ -100,7 +100,7 @@ describe("ConfigLoader", () => {
     });
 
     it("should throw error for invalid port", () => {
-      const invalidConfig = { ...validConfig };
+      const invalidConfig = JSON.parse(JSON.stringify(validConfig));
       invalidConfig.server.port = "invalid";
 
       const yaml = require("js-yaml");
@@ -114,29 +114,41 @@ describe("ConfigLoader", () => {
     });
 
     it("should throw error for missing services", () => {
-      const invalidConfig = { ...validConfig };
+      const invalidConfig = JSON.parse(JSON.stringify(validConfig));
       delete invalidConfig.services;
 
+      const uniqueConfigPath = "test-config-missing-services.yaml";
       const yaml = require("js-yaml");
-      fs.writeFileSync(testConfigPath, yaml.dump(invalidConfig));
+      fs.writeFileSync(uniqueConfigPath, yaml.dump(invalidConfig));
 
-      const configLoader = new ConfigLoader(testConfigPath);
+      const configLoader = new ConfigLoader(uniqueConfigPath);
 
       expect(() => configLoader.load()).to.throw(
         "Services configuration must be an array"
       );
+
+      // Clean up
+      if (fs.existsSync(uniqueConfigPath)) {
+        fs.unlinkSync(uniqueConfigPath);
+      }
     });
 
     it("should throw error for invalid UUID", () => {
-      const invalidConfig = { ...validConfig };
+      const invalidConfig = JSON.parse(JSON.stringify(validConfig));
       invalidConfig.services[0].id = "invalid-uuid";
 
+      const uniqueConfigPath = "test-config-invalid-uuid.yaml";
       const yaml = require("js-yaml");
-      fs.writeFileSync(testConfigPath, yaml.dump(invalidConfig));
+      fs.writeFileSync(uniqueConfigPath, yaml.dump(invalidConfig));
 
-      const configLoader = new ConfigLoader(testConfigPath);
+      const configLoader = new ConfigLoader(uniqueConfigPath);
 
       expect(() => configLoader.load()).to.throw("Invalid UUID format");
+
+      // Clean up
+      if (fs.existsSync(uniqueConfigPath)) {
+        fs.unlinkSync(uniqueConfigPath);
+      }
     });
   });
 

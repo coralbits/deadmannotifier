@@ -1,42 +1,56 @@
 const Database = require("../db/database");
-const ConfigLoader = require("../services/config");
 
 async function listCommand(options) {
-  const { config } = options;
+  const { configLoader } = options;
 
   try {
-    // Load configuration
-    const configLoader = new ConfigLoader(config);
-    configLoader.load();
-
     // Initialize database
     const dbPath = configLoader.getDatabaseConfig().path;
     const db = new Database(dbPath);
     await db.init();
 
-    // Get current states
+    // Get configured services
+    const services = configLoader.getServices();
+    const serverConfig = configLoader.getServerConfig();
+
+    // Get current states from database
     const currentStates = await db.getCurrentStates();
 
-    console.log("\nCurrent Service States:");
-    console.log("======================");
+    // Create a map of service ID to current state for quick lookup
+    const stateMap = {};
+    currentStates.forEach((state) => {
+      stateMap[state.service_id] = state;
+    });
 
-    if (currentStates.length === 0) {
-      console.log("No services have reported status yet.");
+    console.log("\nService Status Report:");
+    console.log("=====================");
+    console.log(`Server: ${serverConfig.host}:${serverConfig.port}`);
+    console.log("");
+
+    if (services.length === 0) {
+      console.log("No services configured.");
     } else {
-        // Create a map of service ID to name for display
-        const serviceMap = {};
-        configLoader.getServices().forEach((service) => {
-          serviceMap[service.id] = service.name;
-        });
+      services.forEach((service) => {
+        const currentState = stateMap[service.id];
+        const serviceName = service.name;
 
-      currentStates.forEach((state) => {
-        const serviceName = serviceMap[state.service_id] || "Unknown Service";
-        const timestamp = new Date(state.last_updated).toLocaleString();
-        console.log(
-          `${serviceName.padEnd(20)} | ${state.state
-            .toUpperCase()
-            .padEnd(3)} | ${timestamp}`
-        );
+        if (currentState) {
+          const status = currentState.state.toUpperCase();
+          const timestamp = new Date(
+            currentState.last_updated
+          ).toLocaleString();
+          const url = `http://${serverConfig.host}:${serverConfig.port}/${service.id}/{state}`;
+          console.log(
+            `${serviceName.padEnd(20)} | ${status.padEnd(
+              3
+            )} | ${timestamp} | ${url}`
+          );
+        } else {
+          const url = `http://${serverConfig.host}:${serverConfig.port}/${service.id}/{state}`;
+          console.log(
+            `${serviceName.padEnd(20)} | MISSING | No status reported | ${url}`
+          );
+        }
       });
     }
 

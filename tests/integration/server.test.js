@@ -11,6 +11,13 @@ describe("Server Integration Tests", () => {
   const testDbPath = "test-server.db";
 
   const validConfig = {
+    server: {
+      host: "127.0.0.1",
+      port: 3000,
+    },
+    database: {
+      path: "test-server.db",
+    },
     email: {
       from: "test@example.com",
       to: "admin@example.com",
@@ -41,7 +48,7 @@ describe("Server Integration Tests", () => {
       fs.unlinkSync(testDbPath);
     }
 
-    server = new Server(testConfigPath, testDbPath);
+    server = new Server(testConfigPath);
     await server.init();
     app = server.app;
   });

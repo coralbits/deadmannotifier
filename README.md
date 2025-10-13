@@ -11,7 +11,7 @@ A REST service for monitoring service health with email notifications.
    ```
 
 2. **Configure the service:**
-   Edit `config.yaml` with your email settings and services.
+   Edit `config.yaml` with your server, database, email settings and services.
 
 3. **Start the server:**
 
@@ -33,6 +33,27 @@ A REST service for monitoring service health with email notifications.
 - `dms logs` - Show latest events
 - `dms cron` - Start cron job service
 - `dms cron --init` - Setup system cron entry
+
+### Command Line Options
+
+All commands support the `-c, --config <path>` option to specify a custom config file:
+
+```bash
+dms serve --config /data/config.yaml
+dms list --config /etc/deadman/config.yaml
+dms logs --config /data/config.yaml
+dms cron --config /data/config.yaml
+```
+
+The `serve` command also supports:
+
+- `-h, --host <host>` - Override the host from config
+- `-p, --port <port>` - Override the port from config
+
+```bash
+dms serve --host 127.0.0.1 --port 8080
+dms serve --config /data/config.yaml --host 0.0.0.0 --port 3000
+```
 
 ## Docker
 

@@ -1,12 +1,13 @@
 const Server = require("../server");
 
 async function serveCommand(options) {
-  const { port, config } = options;
+  const { port, host, config } = options;
 
   try {
     console.log(`Starting Dead Man Notifier server...`);
     console.log(`Config: ${config}`);
-    console.log(`Port: ${port}`);
+    console.log(`Host: ${host || 'from config'}`);
+    console.log(`Port: ${port || 'from config'}`);
 
     const server = new Server(config);
 
@@ -23,7 +24,7 @@ async function serveCommand(options) {
       process.exit(0);
     });
 
-    await server.start(parseInt(port));
+    await server.start(port ? parseInt(port) : null, host);
   } catch (error) {
     console.error("Failed to start server:", error.message);
     process.exit(1);

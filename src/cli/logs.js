@@ -7,10 +7,11 @@ async function logsCommand(options) {
   try {
     // Load configuration
     const configLoader = new ConfigLoader(config);
-    const configData = configLoader.load();
+    configLoader.load();
 
     // Initialize database
-    const db = new Database();
+    const dbPath = configLoader.getDatabaseConfig().path;
+    const db = new Database(dbPath);
     await db.init();
 
     // Get latest events
@@ -22,11 +23,11 @@ async function logsCommand(options) {
     if (events.length === 0) {
       console.log("No events found.");
     } else {
-      // Create a map of service ID to name for display
-      const serviceMap = {};
-      configData.getServices().forEach((service) => {
-        serviceMap[service.id] = service.name;
-      });
+        // Create a map of service ID to name for display
+        const serviceMap = {};
+        configLoader.getServices().forEach((service) => {
+          serviceMap[service.id] = service.name;
+        });
 
       events.forEach((event) => {
         const serviceName = serviceMap[event.service_id] || "Unknown Service";

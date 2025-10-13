@@ -7,6 +7,13 @@ describe("ConfigLoader", () => {
   const testConfigPath = "test-config.yaml";
 
   const validConfig = {
+    server: {
+      host: "0.0.0.0",
+      port: 3000,
+    },
+    database: {
+      path: "test.db",
+    },
     email: {
       from: "test@example.com",
       to: "admin@example.com",
@@ -64,9 +71,9 @@ describe("ConfigLoader", () => {
       expect(() => configLoader.load()).to.not.throw();
     });
 
-    it("should throw error for missing email config", () => {
+    it("should throw error for missing server config", () => {
       const invalidConfig = { ...validConfig };
-      delete invalidConfig.email;
+      delete invalidConfig.server;
 
       const yaml = require("js-yaml");
       fs.writeFileSync(testConfigPath, yaml.dump(invalidConfig));
@@ -74,7 +81,35 @@ describe("ConfigLoader", () => {
       const configLoader = new ConfigLoader(testConfigPath);
 
       expect(() => configLoader.load()).to.throw(
-        "Email configuration is required"
+        "Server configuration is required"
+      );
+    });
+
+    it("should throw error for missing database config", () => {
+      const invalidConfig = { ...validConfig };
+      delete invalidConfig.database;
+
+      const yaml = require("js-yaml");
+      fs.writeFileSync(testConfigPath, yaml.dump(invalidConfig));
+
+      const configLoader = new ConfigLoader(testConfigPath);
+
+      expect(() => configLoader.load()).to.throw(
+        "Database configuration is required"
+      );
+    });
+
+    it("should throw error for invalid port", () => {
+      const invalidConfig = { ...validConfig };
+      invalidConfig.server.port = "invalid";
+
+      const yaml = require("js-yaml");
+      fs.writeFileSync(testConfigPath, yaml.dump(invalidConfig));
+
+      const configLoader = new ConfigLoader(testConfigPath);
+
+      expect(() => configLoader.load()).to.throw(
+        "Server port must be a number between 1 and 65535"
       );
     });
 

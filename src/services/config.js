@@ -26,6 +26,32 @@ class ConfigLoader {
       throw new Error("Config is null or undefined");
     }
 
+    // Validate server configuration
+    if (!this.config.server) {
+      throw new Error("Server configuration is required");
+    }
+
+    const requiredServerFields = ["host", "port"];
+    for (const field of requiredServerFields) {
+      if (!this.config.server[field]) {
+        throw new Error(`Server configuration missing required field: ${field}`);
+      }
+    }
+
+    // Validate port is a number
+    if (typeof this.config.server.port !== "number" || this.config.server.port < 1 || this.config.server.port > 65535) {
+      throw new Error("Server port must be a number between 1 and 65535");
+    }
+
+    // Validate database configuration
+    if (!this.config.database) {
+      throw new Error("Database configuration is required");
+    }
+
+    if (!this.config.database.path) {
+      throw new Error("Database path is required");
+    }
+
     // Validate email configuration
     if (!this.config.email) {
       throw new Error("Email configuration is required");
@@ -101,6 +127,14 @@ class ConfigLoader {
 
   getServices() {
     return this.config.services;
+  }
+
+  getServerConfig() {
+    return this.config.server;
+  }
+
+  getDatabaseConfig() {
+    return this.config.database;
   }
 }
 

@@ -16,7 +16,8 @@ program
 program
   .command("serve")
   .description("Start the Dead Man Notifier server")
-  .option("-p, --port <port>", "Port to listen on", "3000")
+  .option("-h, --host <host>", "Host to bind to")
+  .option("-p, --port <port>", "Port to listen on")
   .option("-c, --config <path>", "Path to config file", "config.yaml")
   .action(serveCommand);
 

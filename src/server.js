@@ -17,8 +17,11 @@ class Server {
     this.config = configLoader.load();
     this.configLoader = configLoader; // Store the loader instance for method access
 
+    // Get database path from config if not provided
+    const dbPath = this.dbPath || this.configLoader.getDatabaseConfig().path;
+
     // Initialize database
-    this.db = new Database(this.dbPath);
+    this.db = new Database(dbPath);
     await this.db.init();
 
     // Setup middleware
@@ -91,15 +94,20 @@ class Server {
     });
   }
 
-  async start(port = 3000) {
+  async start(port = null, host = null) {
     await this.init();
 
+    // Use config values if not provided
+    const serverConfig = this.configLoader.getServerConfig();
+    const serverPort = port || serverConfig.port;
+    const serverHost = host || serverConfig.host;
+
     return new Promise((resolve, reject) => {
-      this.server = this.app.listen(port, (err) => {
+      this.server = this.app.listen(serverPort, serverHost, (err) => {
         if (err) {
           reject(err);
         } else {
-          console.log(`Dead Man Notifier server running on port ${port}`);
+          console.log(`Dead Man Notifier server running on ${serverHost}:${serverPort}`);
           resolve();
         }
       });

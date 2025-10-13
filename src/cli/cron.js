@@ -11,31 +11,18 @@ async function cronCommand(options) {
   }
 
   try {
-    console.log("Starting cron service...");
+    console.log("Checking if cron job should run...");
 
     const cronService = new CronService(config);
     await cronService.init();
 
-    // Handle graceful shutdown
-    process.on("SIGINT", async () => {
-      console.log("\nReceived SIGINT, shutting down gracefully...");
-      await cronService.close();
-      process.exit(0);
-    });
+    // Check if we should run the cron job and run it if needed
+    await cronService.checkAndRunIfNeeded();
 
-    process.on("SIGTERM", async () => {
-      console.log("\nReceived SIGTERM, shutting down gracefully...");
-      await cronService.close();
-      process.exit(0);
-    });
-
-    // Start the cron job
-    cronService.start();
-
-    // Keep the process running
-    console.log("Cron service is running. Press Ctrl+C to stop.");
+    await cronService.close();
+    console.log("Cron check completed.");
   } catch (error) {
-    console.error("Failed to start cron service:", error.message);
+    console.error("Failed to run cron check:", error.message);
     process.exit(1);
   }
 }
@@ -51,8 +38,8 @@ async function initCronEntry(configPath) {
     configLoader.load();
     const cronExpression = configLoader.getCronConfig();
 
-    // Create cron entry
-    const cronEntry = `${cronExpression} cd ${path.dirname(
+    // Create cron entry - run every minute to check if we should send email
+    const cronEntry = `* * * * * cd ${path.dirname(
       scriptPath
     )} && node ${scriptPath} cron -c ${configPathResolved}`;
 

@@ -50,10 +50,12 @@
       {{#each logs}}
         <div class="logs">
           <strong>{{serviceName}} ({{state}})</strong>
-          -
+          <hr />
           {{timestamp}}
           {{#if logs}}
-            {{logs}}
+            <pre>
+              {{logs}}
+            </pre>
           {{/if}}
         </div>
       {{/each}}

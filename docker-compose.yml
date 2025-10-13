@@ -1,6 +1,7 @@
 services:
   deadman-notifier:
     build: .
+    image: ghcr.io/coralbits/deadmannotifier:latest
     container_name: deadman-notifier
     environment:
       - NODE_ENV=production

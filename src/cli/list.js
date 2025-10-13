@@ -22,9 +22,17 @@ async function listCommand(options) {
       stateMap[state.service_id] = state;
     });
 
+    // Determine the base URL to use
+    const baseUrl =
+      serverConfig.external_url ||
+      `http://${serverConfig.host}:${serverConfig.port}`;
+
     console.log("\nService Status Report:");
     console.log("=====================");
     console.log(`Server: ${serverConfig.host}:${serverConfig.port}`);
+    if (serverConfig.external_url) {
+      console.log(`External URL: ${serverConfig.external_url}`);
+    }
     console.log("");
 
     if (services.length === 0) {
@@ -39,14 +47,14 @@ async function listCommand(options) {
           const timestamp = new Date(
             currentState.last_updated
           ).toLocaleString();
-          const url = `http://${serverConfig.host}:${serverConfig.port}/${service.id}/{state}`;
+          const url = `${baseUrl}/${service.id}/{state}`;
           console.log(
             `${serviceName.padEnd(20)} | ${status.padEnd(
               3
             )} | ${timestamp} | ${url}`
           );
         } else {
-          const url = `http://${serverConfig.host}:${serverConfig.port}/${service.id}/{state}`;
+          const url = `${baseUrl}/${service.id}/{state}`;
           console.log(
             `${serviceName.padEnd(20)} | MISSING | No status reported | ${url}`
           );

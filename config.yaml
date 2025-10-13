@@ -2,6 +2,7 @@ server:
   host: "0.0.0.0"
   port: 3001
   with_cron: true
+  external_url: "https://deadman.example.com"
 
 database:
   path: "data/deadman.db"

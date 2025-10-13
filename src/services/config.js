@@ -56,6 +56,20 @@ class ConfigLoader {
       throw new Error("Server with_cron must be a boolean value");
     }
 
+    // Validate external_url is a valid URL if present
+    if (
+      this.config.server.external_url !== undefined &&
+      typeof this.config.server.external_url === "string"
+    ) {
+      try {
+        new URL(this.config.server.external_url);
+      } catch (error) {
+        throw new Error("Server external_url must be a valid URL");
+      }
+    } else if (this.config.server.external_url !== undefined) {
+      throw new Error("Server external_url must be a string");
+    }
+
     // Validate database configuration
     if (!this.config.database) {
       throw new Error("Database configuration is required");

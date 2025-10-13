@@ -94,7 +94,7 @@ npm run test:integration
 
 See `config.yaml` for configuration options. The file includes:
 
-- **Server settings**: host, port, and embedded cron option
+- **Server settings**: host, port, embedded cron option, and external URL
 - **Database settings**: SQLite database path
 - **Email SMTP settings**: SMTP server configuration for notifications
 - **Cron schedule**: When to send periodic reports
@@ -107,6 +107,7 @@ server:
   host: "0.0.0.0"
   port: 3000
   with_cron: false # Enable embedded cron service
+  external_url: "https://deadman.example.com" # Optional external URL for service pings
 
 database:
   path: "deadman.db"

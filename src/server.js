@@ -1,6 +1,7 @@
 const express = require("express");
 const Database = require("./db/database");
 const ConfigLoader = require("./services/config");
+const CronService = require("./services/cron");
 
 class Server {
   constructor(configPath = "config.yaml", dbPath = "deadman.db") {
@@ -9,6 +10,7 @@ class Server {
     this.app = express();
     this.db = null;
     this.config = null;
+    this.cronService = null;
   }
 
   async init() {
@@ -94,7 +96,31 @@ class Server {
     });
   }
 
-  async start(port = null, host = null) {
+  async startEmbeddedCron() {
+    try {
+      const serverConfig = this.configLoader.getServerConfig();
+      if (serverConfig.with_cron) {
+        console.log("Starting embedded cron service...");
+        this.cronService = new CronService(this.configPath, this.dbPath);
+        await this.cronService.init();
+        this.cronService.start();
+        console.log("Embedded cron service started");
+      }
+    } catch (error) {
+      console.error("Failed to start embedded cron service:", error);
+    }
+  }
+
+  async stopEmbeddedCron() {
+    if (this.cronService) {
+      console.log("Stopping embedded cron service...");
+      await this.cronService.close();
+      this.cronService = null;
+      console.log("Embedded cron service stopped");
+    }
+  }
+
+  async start(port = null, host = null, withCron = null) {
     await this.init();
 
     // Use config values if not provided
@@ -102,12 +128,25 @@ class Server {
     const serverPort = port || serverConfig.port;
     const serverHost = host || serverConfig.host;
 
+    // Override with_cron from CLI if provided
+    if (withCron !== null) {
+      serverConfig.with_cron = withCron;
+    }
+
     return new Promise((resolve, reject) => {
-      this.server = this.app.listen(serverPort, serverHost, (err) => {
+      this.server = this.app.listen(serverPort, serverHost, async (err) => {
         if (err) {
           reject(err);
         } else {
-          console.log(`Dead Man Notifier server running on ${serverHost}:${serverPort}`);
+          console.log(
+            `Dead Man Notifier server running on ${serverHost}:${serverPort}`
+          );
+
+          // Start embedded cron if enabled
+          if (serverConfig.with_cron) {
+            await this.startEmbeddedCron();
+          }
+
           resolve();
         }
       });
@@ -115,7 +154,10 @@ class Server {
   }
 
   async stop() {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
+      // Stop embedded cron first
+      await this.stopEmbeddedCron();
+
       if (this.server) {
         this.server.close(() => {
           console.log("Server stopped");

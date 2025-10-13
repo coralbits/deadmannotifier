@@ -19,6 +19,7 @@ program
   .option("-h, --host <host>", "Host to bind to")
   .option("-p, --port <port>", "Port to listen on")
   .option("-c, --config <path>", "Path to config file", "config.yaml")
+  .option("--with-cron", "Enable embedded cron job")
   .action(serveCommand);
 
 program

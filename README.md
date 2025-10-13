@@ -49,11 +49,27 @@ The `serve` command also supports:
 
 - `-h, --host <host>` - Override the host from config
 - `-p, --port <port>` - Override the port from config
+- `--with-cron` - Enable embedded cron job (overrides config setting)
 
 ```bash
 dms serve --host 127.0.0.1 --port 8080
 dms serve --config /data/config.yaml --host 0.0.0.0 --port 3000
+dms serve --with-cron  # Enable embedded cron job
 ```
+
+### Embedded Cron Service
+
+The server can run with an embedded cron service that automatically sends status emails at the configured schedule. This can be enabled in two ways:
+
+1. **Via config file** - Set `with_cron: true` in the server section
+2. **Via command line** - Use the `--with-cron` flag
+
+When enabled, the server will:
+
+- Start the REST API server
+- Automatically run cron jobs at the configured schedule
+- Send email reports with service status
+- Handle graceful shutdown of both services
 
 ## Docker
 
@@ -78,9 +94,41 @@ npm run test:integration
 
 See `config.yaml` for configuration options. The file includes:
 
-- Email SMTP settings
-- Cron schedule
-- Service definitions with UUIDs
+- **Server settings**: host, port, and embedded cron option
+- **Database settings**: SQLite database path
+- **Email SMTP settings**: SMTP server configuration for notifications
+- **Cron schedule**: When to send periodic reports
+- **Service definitions**: UUIDs and names for monitored services
+
+Example configuration:
+
+```yaml
+server:
+  host: "0.0.0.0"
+  port: 3000
+  with_cron: false # Enable embedded cron service
+
+database:
+  path: "deadman.db"
+
+email:
+  from: "alerts@example.com"
+  to: "admin@example.com"
+  subject: "Service Status Report"
+  smtp:
+    host: "smtp.example.com"
+    port: 587
+    user: "alerts@example.com"
+    password: "your-password"
+
+cron: "0 */6 * * *" # Every 6 hours
+
+services:
+  - id: "550e8400-e29b-41d4-a716-446655440000"
+    name: "Database Backup"
+  - id: "550e8400-e29b-41d4-a716-446655440001"
+    name: "File Sync Service"
+```
 
 ## Usage
 

@@ -34,13 +34,27 @@ class ConfigLoader {
     const requiredServerFields = ["host", "port"];
     for (const field of requiredServerFields) {
       if (!this.config.server[field]) {
-        throw new Error(`Server configuration missing required field: ${field}`);
+        throw new Error(
+          `Server configuration missing required field: ${field}`
+        );
       }
     }
 
     // Validate port is a number
-    if (typeof this.config.server.port !== "number" || this.config.server.port < 1 || this.config.server.port > 65535) {
+    if (
+      typeof this.config.server.port !== "number" ||
+      this.config.server.port < 1 ||
+      this.config.server.port > 65535
+    ) {
       throw new Error("Server port must be a number between 1 and 65535");
+    }
+
+    // Validate with_cron is boolean if present
+    if (
+      this.config.server.with_cron !== undefined &&
+      typeof this.config.server.with_cron !== "boolean"
+    ) {
+      throw new Error("Server with_cron must be a boolean value");
     }
 
     // Validate database configuration

@@ -44,12 +44,20 @@ async function logsCommand(options) {
         latestEvents.forEach((event) => {
           const serviceName = serviceMap[event.service_id] || "Unknown Service";
           const timestamp = new Date(event.timestamp).toISOString();
-          const logs = event.logs ? `\n    Logs: ${event.logs}` : "";
+
           console.log(
             `${timestamp} | ${serviceName.padEnd(20)} | ${event.state
               .toUpperCase()
-              .padEnd(3)} | ${event.source_ip}${logs}`
+              .padEnd(3)} | ${event.source_ip}`
           );
+
+          if (event.logs) {
+            // Display logs with proper newline handling
+            const logLines = event.logs.split("\n");
+            logLines.forEach((line) => {
+              console.log(`    ${line}`);
+            });
+          }
         });
       }
     }

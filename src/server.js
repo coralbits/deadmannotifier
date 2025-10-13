@@ -25,6 +25,7 @@ class Server {
 
     // Setup middleware
     this.app.use(express.text({ type: "*/*" }));
+    this.app.use(express.urlencoded({ extended: true }));
     this.app.use(express.json());
 
     // Request logging middleware

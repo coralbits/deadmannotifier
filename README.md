@@ -22,9 +22,24 @@ A REST service for monitoring service health with email notifications.
    ```
 
 4. **Test a service ping:**
+
    ```bash
    curl -X PUT http://localhost:3000/438c41d2-f4d8-4697-aaa6-ab7bfd02b07d/ok
    ```
+
+5. **Send logs with a file:**
+
+   ```bash
+   # Correct way - preserves newlines and special characters
+   curl -X PUT http://localhost:3000/438c41d2-f4d8-4697-aaa6-ab7bfd02b07d/ok --data-binary @logfile.txt
+
+   # Alternative - with explicit content type
+   curl -X PUT http://localhost:3000/438c41d2-f4d8-4697-aaa6-ab7bfd02b07d/ok \
+     -H "Content-Type: text/plain" \
+     --data-binary @logfile.txt
+   ```
+
+   **Note**: Using `-d @file` will URL-encode the content and convert newlines to literal `\n` characters, which may not display correctly in logs.
 
 ## CLI Commands
 

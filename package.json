@@ -1,0 +1,40 @@
+{
+  "name": "deadmannotifier",
+  "version": "1.0.0",
+  "description": "Dead Man Notifier - REST service for monitoring service health",
+  "main": "src/index.js",
+  "bin": {
+    "dms": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js serve",
+    "test": "mocha tests/**/*.test.js",
+    "test:unit": "mocha tests/unit/**/*.test.js",
+    "test:integration": "mocha tests/integration/**/*.test.js"
+  },
+  "keywords": [
+    "monitoring",
+    "health-check",
+    "notifications",
+    "dead-man-switch"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6",
+    "nodemailer": "^6.9.7",
+    "js-yaml": "^4.1.0",
+    "commander": "^11.1.0",
+    "handlebars": "^4.7.8",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "mocha": "^10.2.0",
+    "chai": "^4.3.7",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

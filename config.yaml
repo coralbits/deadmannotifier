@@ -1,0 +1,18 @@
+email:
+  from: "john.doe@example.com"
+  to: "jane.doe@example.com"
+  subject: "Dead Man Notifier"
+  body: "This is a test email"
+  smtp:
+    host: "smtp.example.com"
+    port: 587
+    user: "john.doe@example.com"
+    password: "password"
+
+cron: "0 0 * * *"
+
+services:
+  - id: 438c41d2-f4d8-4697-aaa6-ab7bfd02b07d
+    name: "Backup github"
+  - id: 438c41d2-f4d8-4697-aaa6-ab7bfd02b07e
+    name: "Backup docker"

@@ -1,0 +1,67 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>{{subject}}</title>
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #333;
+      max-width: 800px; margin: 0 auto; padding: 20px; } .header {
+      background-color: #f4f4f4; padding: 20px; border-radius: 5px;
+      margin-bottom: 20px; } .status-table { width: 100%; border-collapse:
+      collapse; margin: 20px 0; } .status-table th, .status-table td { border:
+      1px solid #ddd; padding: 12px; text-align: left; } .status-table th {
+      background-color: #f2f2f2; font-weight: bold; } .status-ok {
+      background-color: #d4edda; color: #155724; } .status-nok {
+      background-color: #fff3cd; color: #856404; } .status-nak {
+      background-color: #f8d7da; color: #721c24; } .logs { background-color:
+      #f8f9fa; border: 1px solid #e9ecef; border-radius: 5px; padding: 15px;
+      margin: 10px 0; font-family: monospace; white-space: pre-wrap; } .footer {
+      margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;
+      font-size: 0.9em; color: #666; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>{{subject}}</h1>
+      <p>Generated on {{timestamp}}</p>
+    </div>
+
+    <h2>Service Status Summary</h2>
+    <table class="status-table">
+      <thead>
+        <tr>
+          <th>Service Name</th>
+          <th>Status</th>
+          <th>Last Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each services}}
+          <tr>
+            <td>{{name}}</td>
+            <td class="status-{{state}}">{{state}}</td>
+            <td>{{lastUpdated}}</td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+    {{#if hasLogs}}
+      <h2>Recent Logs</h2>
+      {{#each logs}}
+        <div class="logs">
+          <strong>{{serviceName}} ({{state}})</strong>
+          -
+          {{timestamp}}
+          {{#if logs}}
+            {{logs}}
+          {{/if}}
+        </div>
+      {{/each}}
+    {{/if}}
+
+    <div class="footer">
+      <p>This is an automated message from Dead Man Notifier.</p>
+      <p>Worst state detected: <strong>{{worstState}}</strong></p>
+    </div>
+  </body>
+</html>

@@ -26,24 +26,36 @@
     </div>
 
     <h2>Service Status Summary</h2>
-    <table class="status-table">
-      <thead>
-        <tr>
-          <th>Service Name</th>
-          <th>Status</th>
-          <th>Last Updated</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each services}}
+    {{#if services}}
+      <table class="status-table">
+        <thead>
           <tr>
-            <td>{{name}}</td>
-            <td class="status-{{state}}">{{state}}</td>
-            <td>{{lastUpdated}}</td>
+            <th>Service Name</th>
+            <th>Status</th>
+            <th>Last Updated</th>
           </tr>
-        {{/each}}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {{#each services}}
+            <tr>
+              <td>{{name}}</td>
+              <td class="status-{{state}}">
+                {{#if (eq state "nak")}}
+                  ⚠️
+                  {{state}}
+                  (MISSING!)
+                {{else}}
+                  {{state}}
+                {{/if}}
+              </td>
+              <td>{{lastUpdated}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    {{else}}
+      <p>No services configured.</p>
+    {{/if}}
 
     {{#if hasLogs}}
       <h2>Recent Logs</h2>

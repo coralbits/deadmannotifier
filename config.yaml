@@ -25,3 +25,5 @@ services:
     name: "Backup github"
   - id: 438c41d2-f4d8-4697-aaa6-ab7bfd02b07e
     name: "Backup docker"
+  - id: 438c41d2-f4d8-4697-aaa6-ab7bfd02b07f
+    name: "Database Sync"

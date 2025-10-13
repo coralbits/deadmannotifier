@@ -32,16 +32,47 @@ class CronService {
     try {
       console.log("Running cron job...");
 
-      // Get current states of all services
+      // Get all configured services
+      const configuredServices = this.configLoader.getServices();
+
+      // Get current states of all services that have reported
       const currentStates = await this.db.getCurrentStates();
 
-      // Get latest event for each configured service
-      const configuredServices = this.configLoader.getServices();
+      // Create a map of service ID to current state
+      const stateMap = {};
+      currentStates.forEach((state) => {
+        stateMap[state.service_id] = state;
+      });
+
+      // Build complete service list including missing services
+      const allServices = [];
       const latestEvents = [];
+
       for (const service of configuredServices) {
-        const latestEvent = await this.db.getLatestEventForService(service.id);
-        if (latestEvent) {
-          latestEvents.push(latestEvent);
+        const currentState = stateMap[service.id];
+
+        if (currentState) {
+          // Service has reported, use its current state
+          allServices.push({
+            service_id: service.id,
+            state: currentState.state,
+            last_updated: currentState.last_updated,
+          });
+
+          // Get latest event for this service
+          const latestEvent = await this.db.getLatestEventForService(
+            service.id
+          );
+          if (latestEvent) {
+            latestEvents.push(latestEvent);
+          }
+        } else {
+          // Service has never reported, mark as nak
+          allServices.push({
+            service_id: service.id,
+            state: "nak",
+            last_updated: new Date().toISOString(), // Use current time for missing services
+          });
         }
       }
 
@@ -51,8 +82,8 @@ class CronService {
       console.log("\nService Status Summary:");
       console.log("========================");
 
-      if (currentStates.length === 0) {
-        console.log("No services have reported status yet.");
+      if (allServices.length === 0) {
+        console.log("No services configured.");
       } else {
         // Create a map of service ID to name for display
         const serviceMap = {};
@@ -60,7 +91,7 @@ class CronService {
           serviceMap[service.id] = service.name;
         });
 
-        currentStates.forEach((state) => {
+        allServices.forEach((state) => {
           const serviceName = serviceMap[state.service_id] || "Unknown Service";
           const timestamp = new Date(state.last_updated).toISOString();
           console.log(
@@ -94,14 +125,14 @@ class CronService {
       }
 
       // Determine worst state
-      const worstState = this.getWorstState(currentStates);
+      const worstState = this.getWorstState(allServices);
       console.log(`\nWorst state detected: ${worstState.toUpperCase()}`);
       console.log("========================\n");
 
       if (testMode) {
-        await this.writeEmailToFile(currentStates, latestEvents);
+        await this.writeEmailToFile(allServices, latestEvents);
       } else {
-        await this.sendEmailAndResetServices(currentStates, latestEvents);
+        await this.sendEmailAndResetServices(allServices, latestEvents);
       }
 
       console.log("Cron job completed successfully");
@@ -110,14 +141,14 @@ class CronService {
     }
   }
 
-  async writeEmailToFile(currentStates, latestEvents) {
+  async writeEmailToFile(allServices, latestEvents) {
     // Transform data for email service
     const serviceMap = {};
     this.configLoader.getServices().forEach((service) => {
       serviceMap[service.id] = service.name;
     });
 
-    const servicesForEmail = currentStates.map((state) => ({
+    const servicesForEmail = allServices.map((state) => ({
       name: serviceMap[state.service_id] || "Unknown Service",
       state: state.state,
       last_updated: state.last_updated,
@@ -151,9 +182,9 @@ class CronService {
     console.log(`\nNote: Services were NOT reset to NAK status in test mode.`);
   }
 
-  async sendEmailAndResetServices(currentStates, latestEvents) {
+  async sendEmailAndResetServices(allServices, latestEvents) {
     // Send email with current status
-    await this.emailService.sendStatusEmail(currentStates, latestEvents);
+    await this.emailService.sendStatusEmail(allServices, latestEvents);
 
     // Mark all services as "nak" after sending email
     await this.db.markAllServicesAsNak();

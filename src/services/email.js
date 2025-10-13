@@ -22,6 +22,11 @@ class EmailService {
       },
     });
 
+    // Register Handlebars helpers
+    handlebars.registerHelper("eq", function (a, b) {
+      return a === b;
+    });
+
     // Load and compile email template
     const templatePath = path.join(__dirname, "../templates/email.hbs");
     const templateSource = fs.readFileSync(templatePath, "utf8");

@@ -103,6 +103,25 @@ class Database {
     });
   }
 
+  async getLatestEventForService(serviceId) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT * FROM events 
+        WHERE service_id = ?
+        ORDER BY timestamp DESC 
+        LIMIT 1
+      `;
+
+      this.db.get(sql, [serviceId], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
   async markAllServicesAsNak() {
     return new Promise((resolve, reject) => {
       const sql = `

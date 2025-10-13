@@ -35,8 +35,15 @@ class CronService {
       // Get current states of all services
       const currentStates = await this.db.getCurrentStates();
 
-      // Get latest events for context
-      const latestEvents = await this.db.getLatestEvents(20);
+      // Get latest event for each configured service
+      const configuredServices = this.configLoader.getServices();
+      const latestEvents = [];
+      for (const service of configuredServices) {
+        const latestEvent = await this.db.getLatestEventForService(service.id);
+        if (latestEvent) {
+          latestEvents.push(latestEvent);
+        }
+      }
 
       // Output results to stdout
       console.log("\n=== DEAD MAN NOTIFIER REPORT ===");

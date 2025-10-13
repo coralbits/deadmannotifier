@@ -32,107 +32,20 @@ class CronService {
     try {
       console.log("Running cron job...");
 
-      // Get all configured services
-      const configuredServices = this.configLoader.getServices();
+      // Gather all necessary data
+      const cronData = await this.gatherCronData();
 
-      // Get current states of all services that have reported
-      const currentStates = await this.db.getCurrentStates();
+      // Generate and display report
+      this.displayReport(cronData);
 
-      // Create a map of service ID to current state
-      const stateMap = {};
-      currentStates.forEach((state) => {
-        stateMap[state.service_id] = state;
-      });
-
-      // Build complete service list including missing services
-      const allServices = [];
-      const latestEvents = [];
-
-      for (const service of configuredServices) {
-        const currentState = stateMap[service.id];
-
-        if (currentState) {
-          // Service has reported, use its current state
-          allServices.push({
-            service_id: service.id,
-            state: currentState.state,
-            last_updated: currentState.last_updated,
-          });
-
-          // Get latest event for this service
-          const latestEvent = await this.db.getLatestEventForService(
-            service.id
-          );
-          if (latestEvent) {
-            latestEvents.push(latestEvent);
-          }
-        } else {
-          // Service has never reported, mark as nak
-          allServices.push({
-            service_id: service.id,
-            state: "nak",
-            last_updated: new Date().toISOString(), // Use current time for missing services
-          });
-        }
-      }
-
-      // Output results to stdout
-      console.log("\n=== DEAD MAN NOTIFIER REPORT ===");
-      console.log(`Generated on: ${new Date().toISOString()}`);
-      console.log("\nService Status Summary:");
-      console.log("========================");
-
-      if (allServices.length === 0) {
-        console.log("No services configured.");
-      } else {
-        // Create a map of service ID to name for display
-        const serviceMap = {};
-        this.configLoader.getServices().forEach((service) => {
-          serviceMap[service.id] = service.name;
-        });
-
-        allServices.forEach((state) => {
-          const serviceName = serviceMap[state.service_id] || "Unknown Service";
-          const timestamp = new Date(state.last_updated).toISOString();
-          console.log(
-            `${serviceName.padEnd(20)} | ${state.state
-              .toUpperCase()
-              .padEnd(3)} | ${timestamp}`
-          );
-        });
-      }
-
-      if (latestEvents.length > 0) {
-        console.log("\nRecent Logs:");
-        console.log("============");
-
-        // Create a map of service ID to name for display
-        const serviceMap = {};
-        this.configLoader.getServices().forEach((service) => {
-          serviceMap[service.id] = service.name;
-        });
-
-        latestEvents.forEach((event) => {
-          const serviceName = serviceMap[event.service_id] || "Unknown Service";
-          const timestamp = new Date(event.timestamp).toISOString();
-          const logs = event.logs ? `\n    Logs: ${event.logs}` : "";
-          console.log(
-            `${timestamp} | ${serviceName.padEnd(20)} | ${event.state
-              .toUpperCase()
-              .padEnd(3)} | ${event.source_ip}${logs}`
-          );
-        });
-      }
-
-      // Determine worst state
-      const worstState = this.getWorstState(allServices);
-      console.log(`\nWorst state detected: ${worstState.toUpperCase()}`);
-      console.log("========================\n");
-
+      // Send email or write to file
       if (testMode) {
-        await this.writeEmailToFile(allServices, latestEvents);
+        await this.writeEmailToFile(cronData.services, cronData.events);
       } else {
-        await this.sendEmailAndResetServices(allServices, latestEvents);
+        await this.sendEmailAndResetServices(
+          cronData.services,
+          cronData.events
+        );
       }
 
       console.log("Cron job completed successfully");
@@ -141,24 +54,188 @@ class CronService {
     }
   }
 
-  async writeEmailToFile(allServices, latestEvents) {
-    // Transform data for email service
+  /**
+   * Gathers all data needed for cron job processing
+   * @returns {Object} Object containing services, events, and service map
+   */
+  async gatherCronData() {
+    const configuredServices = this.configLoader.getServices();
+    const currentStates = await this.db.getCurrentStates();
+
+    // Create maps for efficient lookup
+    const stateMap = this.createStateMap(currentStates);
+    const serviceMap = this.createServiceMap(configuredServices);
+
+    // Build complete service list and gather events
+    const { services, events } = await this.buildServiceList(
+      configuredServices,
+      stateMap
+    );
+
+    return {
+      services,
+      events,
+      serviceMap,
+      configuredServices,
+    };
+  }
+
+  /**
+   * Creates a map of service ID to current state
+   * @param {Array} currentStates - Array of current state objects
+   * @returns {Object} Map of service ID to state
+   */
+  createStateMap(currentStates) {
+    const stateMap = {};
+    currentStates.forEach((state) => {
+      stateMap[state.service_id] = state;
+    });
+    return stateMap;
+  }
+
+  /**
+   * Creates a map of service ID to service name
+   * @param {Array} configuredServices - Array of configured services
+   * @returns {Object} Map of service ID to service name
+   */
+  createServiceMap(configuredServices) {
     const serviceMap = {};
-    this.configLoader.getServices().forEach((service) => {
+    configuredServices.forEach((service) => {
       serviceMap[service.id] = service.name;
     });
+    return serviceMap;
+  }
 
-    const servicesForEmail = allServices.map((state) => ({
+  /**
+   * Builds the complete service list including missing services
+   * @param {Array} configuredServices - Array of configured services
+   * @param {Object} stateMap - Map of service ID to current state
+   * @returns {Object} Object containing services array and events array
+   */
+  async buildServiceList(configuredServices, stateMap) {
+    const services = [];
+    const events = [];
+
+    for (const service of configuredServices) {
+      const currentState = stateMap[service.id];
+
+      if (currentState) {
+        // Service has reported, use its current state
+        services.push({
+          service_id: service.id,
+          state: currentState.state,
+          last_updated: currentState.last_updated,
+        });
+
+        // Get latest event for this service (with complete logs)
+        const latestEvent = await this.db.getLatestEventForService(service.id);
+        if (latestEvent) {
+          events.push(latestEvent);
+        }
+      } else {
+        // Service has never reported, mark as nak
+        services.push({
+          service_id: service.id,
+          state: "nak",
+          last_updated: new Date().toISOString(),
+        });
+      }
+    }
+
+    return { services, events };
+  }
+
+  /**
+   * Displays the cron job report to console
+   * @param {Object} cronData - Object containing services, events, and service map
+   */
+  displayReport(cronData) {
+    const { services, events, serviceMap } = cronData;
+
+    console.log("\n=== DEAD MAN NOTIFIER REPORT ===");
+    console.log(`Generated on: ${new Date().toISOString()}`);
+
+    this.displayServiceStatus(services, serviceMap);
+    this.displayRecentLogs(events, serviceMap);
+
+    const worstState = this.getWorstState(services);
+    console.log(`\nWorst state detected: ${worstState.toUpperCase()}`);
+    console.log("========================\n");
+  }
+
+  /**
+   * Displays service status summary
+   * @param {Array} services - Array of service states
+   * @param {Object} serviceMap - Map of service ID to service name
+   */
+  displayServiceStatus(services, serviceMap) {
+    console.log("\nService Status Summary:");
+    console.log("========================");
+
+    if (services.length === 0) {
+      console.log("No services configured.");
+      return;
+    }
+
+    services.forEach((state) => {
+      const serviceName = serviceMap[state.service_id] || "Unknown Service";
+      const timestamp = new Date(state.last_updated).toISOString();
+      console.log(
+        `${serviceName.padEnd(20)} | ${state.state
+          .toUpperCase()
+          .padEnd(3)} | ${timestamp}`
+      );
+    });
+  }
+
+  /**
+   * Displays recent logs with proper newline handling
+   * @param {Array} events - Array of recent events
+   * @param {Object} serviceMap - Map of service ID to service name
+   */
+  displayRecentLogs(events, serviceMap) {
+    if (events.length === 0) {
+      return;
+    }
+
+    console.log("\nRecent Logs:");
+    console.log("============");
+
+    events.forEach((event) => {
+      const serviceName = serviceMap[event.service_id] || "Unknown Service";
+      const timestamp = new Date(event.timestamp).toISOString();
+
+      console.log(
+        `${timestamp} | ${serviceName.padEnd(20)} | ${event.state
+          .toUpperCase()
+          .padEnd(3)} | ${event.source_ip}`
+      );
+
+      if (event.logs) {
+        // Display logs with proper newline handling (complete logs, not cropped)
+        const logLines = event.logs.split("\n");
+        logLines.forEach((line) => {
+          console.log(`    ${line}`);
+        });
+      }
+    });
+  }
+
+  async writeEmailToFile(services, events) {
+    // Transform data for email service using service map from config
+    const serviceMap = this.createServiceMap(this.configLoader.getServices());
+
+    const servicesForEmail = services.map((state) => ({
       name: serviceMap[state.service_id] || "Unknown Service",
       state: state.state,
       last_updated: state.last_updated,
     }));
 
-    const logsForEmail = latestEvents.map((event) => ({
+    const logsForEmail = events.map((event) => ({
       service_name: serviceMap[event.service_id] || "Unknown Service",
       state: event.state,
       timestamp: event.timestamp,
-      logs: event.logs,
+      logs: event.logs, // Complete logs, not cropped
     }));
 
     // Generate email content
@@ -182,12 +259,28 @@ class CronService {
     console.log(`\nNote: Services were NOT reset to NAK status in test mode.`);
   }
 
-  async sendEmailAndResetServices(allServices, latestEvents) {
-    // Send email with current status
-    await this.emailService.sendStatusEmail(allServices, latestEvents);
+  async sendEmailAndResetServices(services, events) {
+    // Send email with current status using service map from config
+    const serviceMap = this.createServiceMap(this.configLoader.getServices());
+
+    const servicesForEmail = services.map((state) => ({
+      name: serviceMap[state.service_id] || "Unknown Service",
+      state: state.state,
+      last_updated: state.last_updated,
+    }));
+
+    const logsForEmail = events.map((event) => ({
+      service_name: serviceMap[event.service_id] || "Unknown Service",
+      state: event.state,
+      timestamp: event.timestamp,
+      logs: event.logs, // Complete logs, not cropped
+    }));
+
+    await this.emailService.sendStatusEmail(servicesForEmail, logsForEmail);
 
     // Mark all services as "nak" after sending email
     await this.db.markAllServicesAsNak();
+    console.log("All services marked as NAK after email sent");
   }
 
   getWorstState(services) {

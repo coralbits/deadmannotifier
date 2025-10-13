@@ -9,7 +9,7 @@ class Server {
     this.app = express();
     this.db = null;
     this.config = null;
-    this.cronService = null;
+    this._cronService = null;
   }
 
   async init() {
@@ -146,9 +146,9 @@ class Server {
       const serverConfig = this.configLoader.getServerConfig();
       if (serverConfig.with_cron) {
         console.log("Starting embedded cron service...");
-        this.cronService = new CronService(this.configLoader);
-        await this.cronService.init();
-        this.cronService.start();
+        this._cronService = new CronService(this.configLoader);
+        await this._cronService.init();
+        this._cronService.start();
         console.log("Embedded cron service started");
       }
     } catch (error) {
@@ -157,10 +157,10 @@ class Server {
   }
 
   async stopEmbeddedCron() {
-    if (this.cronService) {
+    if (this._cronService) {
       console.log("Stopping embedded cron service...");
-      await this.cronService.close();
-      this.cronService = null;
+      await this._cronService.close();
+      this._cronService = null;
       console.log("Embedded cron service stopped");
     }
   }
@@ -219,6 +219,15 @@ class Server {
     if (this.db) {
       await this.db.close();
     }
+  }
+
+  // Getter for cronService to allow external access
+  get cronService() {
+    return this._cronService;
+  }
+
+  set cronService(value) {
+    this._cronService = value;
   }
 }
 

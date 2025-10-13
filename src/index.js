@@ -21,11 +21,14 @@ function createCommandAction(commandFunction) {
       // Load configuration
       const configLoader = new ConfigLoader(options.config);
       configLoader.load();
-      
+
       // Call the command function with configLoader instead of config path
       await commandFunction({ ...options, configLoader });
     } catch (error) {
-      console.error(`Failed to load config from ${options.config}:`, error.message);
+      console.error(
+        `Failed to load config from ${options.config}:`,
+        error.message
+      );
       process.exit(1);
     }
   };
@@ -38,6 +41,7 @@ program
   .option("-p, --port <port>", "Port to listen on")
   .option("-c, --config <path>", "Path to config file", "config.yaml")
   .option("--with-cron", "Enable embedded cron job")
+  .option("--watch", "Watch config file for changes and reload automatically")
   .action(createCommandAction(serveCommand));
 
 program

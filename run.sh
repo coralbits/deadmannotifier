@@ -59,4 +59,4 @@ cd "$APP_DIR"
 
 # Check if we should run with embedded cron
 echo -e "${GREEN}Starting server...${NC}"
-exec node src/index.js serve --config "$CONFIG_FILE"
+exec node src/index.js serve --config "$CONFIG_FILE" --watch

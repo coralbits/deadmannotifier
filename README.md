@@ -50,11 +50,43 @@ The `serve` command also supports:
 - `-h, --host <host>` - Override the host from config
 - `-p, --port <port>` - Override the port from config
 - `--with-cron` - Enable embedded cron job (overrides config setting)
+- `--watch` - Watch config file for changes and reload automatically
 
 ```bash
 dms serve --host 127.0.0.1 --port 8080
 dms serve --config /data/config.yaml --host 0.0.0.0 --port 3000
 dms serve --with-cron  # Enable embedded cron job
+dms serve --watch      # Watch config file for changes
+```
+
+### Config File Watching
+
+When using the `--watch` flag, the server will automatically reload the configuration when the config file changes:
+
+```bash
+dms serve --watch
+```
+
+**Features:**
+
+- **Automatic reload**: Config changes are detected and applied without restarting the server
+- **Debounced updates**: Rapid file changes are debounced to prevent excessive reloads
+- **Cron service restart**: Embedded cron service is restarted with new config
+- **Error handling**: Invalid config changes are logged but don't crash the server
+- **Visual feedback**: Clear status messages show when config is being reloaded
+
+**Example output:**
+
+```
+Starting Dead Man Notifier server...
+Config Watch: enabled
+Watching config file: /path/to/config.yaml
+
+🔄 Config file changed, reloading...
+✅ Config reloaded successfully
+🔄 Restarting embedded cron service...
+✅ Embedded cron service restarted
+✅ Server reloaded successfully
 ```
 
 ### Embedded Cron Service

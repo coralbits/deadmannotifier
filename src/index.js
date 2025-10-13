@@ -58,6 +58,7 @@ program
   .description("Manage cron jobs")
   .option("-c, --config <path>", "Path to config file", "config.yaml")
   .option("--init", "Initialize cron entry")
+  .option("--test", "Test mode: write email to file instead of sending")
   .action(createCommandAction(cronCommand));
 
 program.parse();

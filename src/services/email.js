@@ -28,6 +28,38 @@ class EmailService {
     this.template = handlebars.compile(templateSource);
   }
 
+  async generateEmailContent(services, logs = []) {
+    if (!this.template) {
+      throw new Error("Email service not initialized");
+    }
+
+    // Determine worst state (nak > nok > ok)
+    const worstState = this.getWorstState(services);
+
+    // Prepare template data
+    const templateData = {
+      subject: `[${worstState.toUpperCase()}] ${this.config.subject}`,
+      timestamp: new Date().toLocaleString(),
+      services: services.map((service) => ({
+        name: service.name,
+        state: service.state,
+        lastUpdated: new Date(service.last_updated).toLocaleString(),
+      })),
+      logs: logs.map((log) => ({
+        serviceName: log.service_name || "Unknown",
+        state: log.state,
+        timestamp: new Date(log.timestamp).toLocaleString(),
+        logs: log.logs,
+      })),
+      hasLogs: logs.length > 0,
+      worstState: worstState.toUpperCase(),
+    };
+
+    // Generate HTML content
+    const html = this.template(templateData);
+    return html;
+  }
+
   async sendStatusEmail(services, logs = []) {
     if (!this.transporter || !this.template) {
       throw new Error("Email service not initialized");

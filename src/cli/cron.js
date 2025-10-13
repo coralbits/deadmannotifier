@@ -3,7 +3,7 @@ const { execSync } = require("child_process");
 const path = require("path");
 
 async function cronCommand(options) {
-  const { configLoader, init } = options;
+  const { configLoader, init, test } = options;
 
   if (init) {
     await initCronEntry(configLoader);
@@ -14,10 +14,16 @@ async function cronCommand(options) {
     console.log("Checking if cron job should run...");
 
     const cronService = new CronService(configLoader);
-    await cronService.init();
 
-    // Check if we should run the cron job and run it if needed
-    await cronService.checkAndRunIfNeeded();
+    if (test) {
+      console.log("Running in test mode - email will be written to file");
+      await cronService.init();
+      await cronService.runTestMode();
+    } else {
+      await cronService.init();
+      // Check if we should run the cron job and run it if needed
+      await cronService.checkAndRunIfNeeded();
+    }
 
     await cronService.close();
     console.log("Cron check completed.");

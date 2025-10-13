@@ -28,7 +28,7 @@ class CronService {
     await this.emailService.init();
   }
 
-  async runCronJob() {
+  async runCronJob(testMode = false) {
     try {
       console.log("Running cron job...");
 
@@ -91,16 +91,66 @@ class CronService {
       console.log(`\nWorst state detected: ${worstState.toUpperCase()}`);
       console.log("========================\n");
 
-      // Send email with current status
-      await this.emailService.sendStatusEmail(currentStates, latestEvents);
-
-      // Mark all services as "nak" after sending email
-      await this.db.markAllServicesAsNak();
+      if (testMode) {
+        await this.writeEmailToFile(currentStates, latestEvents);
+      } else {
+        await this.sendEmailAndResetServices(currentStates, latestEvents);
+      }
 
       console.log("Cron job completed successfully");
     } catch (error) {
       console.error("Cron job failed:", error);
     }
+  }
+
+  async writeEmailToFile(currentStates, latestEvents) {
+    // Transform data for email service
+    const serviceMap = {};
+    this.configLoader.getServices().forEach((service) => {
+      serviceMap[service.id] = service.name;
+    });
+
+    const servicesForEmail = currentStates.map((state) => ({
+      name: serviceMap[state.service_id] || "Unknown Service",
+      state: state.state,
+      last_updated: state.last_updated,
+    }));
+
+    const logsForEmail = latestEvents.map((event) => ({
+      service_name: serviceMap[event.service_id] || "Unknown Service",
+      state: event.state,
+      timestamp: event.timestamp,
+      logs: event.logs,
+    }));
+
+    // Generate email content
+    const emailContent = await this.emailService.generateEmailContent(
+      servicesForEmail,
+      logsForEmail
+    );
+
+    // Write email to temporary file
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    const tempDir = os.tmpdir();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const tempFile = path.join(tempDir, `deadman-test-email-${timestamp}.html`);
+
+    fs.writeFileSync(tempFile, emailContent, "utf8");
+
+    const fileUrl = `file://${tempFile}`;
+    console.log(`Email content written to: ${fileUrl}`);
+    console.log(`You can open this file in your browser to preview the email.`);
+    console.log(`\nNote: Services were NOT reset to NAK status in test mode.`);
+  }
+
+  async sendEmailAndResetServices(currentStates, latestEvents) {
+    // Send email with current status
+    await this.emailService.sendStatusEmail(currentStates, latestEvents);
+
+    // Mark all services as "nak" after sending email
+    await this.db.markAllServicesAsNak();
   }
 
   getWorstState(services) {
@@ -132,6 +182,10 @@ class CronService {
     } catch (error) {
       console.error("Cron check failed:", error);
     }
+  }
+
+  async runTestMode() {
+    await this.runCronJob(true);
   }
 
   async getLastEmailTime() {

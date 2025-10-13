@@ -4,7 +4,6 @@ async function logsCommand(options) {
   const { configLoader, limit } = options;
 
   try {
-
     // Initialize database
     const dbPath = configLoader.getDatabaseConfig().path;
     const db = new Database(dbPath);
@@ -19,15 +18,15 @@ async function logsCommand(options) {
     if (events.length === 0) {
       console.log("No events found.");
     } else {
-        // Create a map of service ID to name for display
-        const serviceMap = {};
-        configLoader.getServices().forEach((service) => {
-          serviceMap[service.id] = service.name;
-        });
+      // Create a map of service ID to name for display
+      const serviceMap = {};
+      configLoader.getServices().forEach((service) => {
+        serviceMap[service.id] = service.name;
+      });
 
       events.forEach((event) => {
         const serviceName = serviceMap[event.service_id] || "Unknown Service";
-        const timestamp = new Date(event.timestamp).toLocaleString();
+        const timestamp = new Date(event.timestamp).toISOString();
         const logs = event.logs ? `\n    Logs: ${event.logs}` : "";
         console.log(
           `${timestamp} | ${serviceName.padEnd(20)} | ${event.state

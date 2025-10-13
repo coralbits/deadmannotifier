@@ -40,7 +40,7 @@ class CronService {
 
       // Output results to stdout
       console.log("\n=== DEAD MAN NOTIFIER REPORT ===");
-      console.log(`Generated on: ${new Date().toLocaleString()}`);
+      console.log(`Generated on: ${new Date().toISOString()}`);
       console.log("\nService Status Summary:");
       console.log("========================");
 
@@ -55,7 +55,7 @@ class CronService {
 
         currentStates.forEach((state) => {
           const serviceName = serviceMap[state.service_id] || "Unknown Service";
-          const timestamp = new Date(state.last_updated).toLocaleString();
+          const timestamp = new Date(state.last_updated).toISOString();
           console.log(
             `${serviceName.padEnd(20)} | ${state.state
               .toUpperCase()
@@ -76,7 +76,7 @@ class CronService {
 
         latestEvents.forEach((event) => {
           const serviceName = serviceMap[event.service_id] || "Unknown Service";
-          const timestamp = new Date(event.timestamp).toLocaleString();
+          const timestamp = new Date(event.timestamp).toISOString();
           const logs = event.logs ? `\n    Logs: ${event.logs}` : "";
           console.log(
             `${timestamp} | ${serviceName.padEnd(20)} | ${event.state

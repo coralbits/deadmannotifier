@@ -44,9 +44,7 @@ async function listCommand(options) {
 
         if (currentState) {
           const status = currentState.state.toUpperCase();
-          const timestamp = new Date(
-            currentState.last_updated
-          ).toLocaleString();
+          const timestamp = new Date(currentState.last_updated).toISOString();
           const url = `${baseUrl}/${service.id}/{state}`;
           console.log(
             `${serviceName.padEnd(20)} | ${status.padEnd(

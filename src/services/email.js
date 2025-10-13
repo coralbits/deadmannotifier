@@ -39,16 +39,16 @@ class EmailService {
     // Prepare template data
     const templateData = {
       subject: `[${worstState.toUpperCase()}] ${this.config.subject}`,
-      timestamp: new Date().toLocaleString(),
+      timestamp: new Date().toISOString(),
       services: services.map((service) => ({
         name: service.name,
         state: service.state,
-        lastUpdated: new Date(service.last_updated).toLocaleString(),
+        lastUpdated: new Date(service.last_updated).toISOString(),
       })),
       logs: logs.map((log) => ({
         serviceName: log.service_name || "Unknown",
         state: log.state,
-        timestamp: new Date(log.timestamp).toLocaleString(),
+        timestamp: new Date(log.timestamp).toISOString(),
         logs: log.logs,
       })),
       hasLogs: logs.length > 0,
@@ -71,16 +71,16 @@ class EmailService {
     // Prepare template data
     const templateData = {
       subject: `[${worstState.toUpperCase()}] ${this.config.subject}`,
-      timestamp: new Date().toLocaleString(),
+      timestamp: new Date().toISOString(),
       services: services.map((service) => ({
         name: service.name,
         state: service.state,
-        lastUpdated: new Date(service.last_updated).toLocaleString(),
+        lastUpdated: new Date(service.last_updated).toISOString(),
       })),
       logs: logs.map((log) => ({
         serviceName: log.service_name || "Unknown",
         state: log.state,
-        timestamp: new Date(log.timestamp).toLocaleString(),
+        timestamp: new Date(log.timestamp).toISOString(),
         logs: log.logs,
       })),
       hasLogs: logs.length > 0,

@@ -12,6 +12,7 @@ RUN npm ci --only=production
 # Copy source code
 COPY src/ ./src/
 COPY config.yaml ./
+COPY run.sh ./
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
@@ -19,6 +20,7 @@ RUN adduser -S deadman -u 1001
 
 # Change ownership of the app directory
 RUN chown -R deadman:nodejs /app
+RUN chmod +x /app/run.sh
 USER deadman
 
 # Expose port
@@ -32,4 +34,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
 # Default command
-CMD ["node", "src/index.js", "serve"]
+CMD ["./run.sh"]

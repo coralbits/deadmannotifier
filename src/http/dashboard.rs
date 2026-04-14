@@ -9,7 +9,7 @@ use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
 use crate::config::AppConfig;
-use crate::cron_logic::{gather_cron_data, service_name_map};
+use crate::cron_logic::{gather_cron_data, service_group_map, service_name_map};
 use crate::db::{EventRow, Store};
 
 use super::heatmap;
@@ -120,12 +120,66 @@ fn parse_service_path(config: &AppConfig, sid: &str) -> Option<String> {
     }
 }
 
+/// Percent-encode a UTF-8 string for use in a single URL path segment.
+fn encode_path_segment(s: &str) -> String {
+    fn is_unreserved(b: u8) -> bool {
+        matches!(
+            b,
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~'
+        )
+    }
+    let mut out = String::with_capacity(s.len());
+    for &b in s.as_bytes() {
+        if is_unreserved(b) {
+            out.push(b as char);
+        } else {
+            use std::fmt::Write;
+            let _ = write!(out, "%{b:02X}");
+        }
+    }
+    out
+}
+
+fn service_ids_for_group_label(config: &AppConfig, group_path_decoded: &str) -> Vec<String> {
+    let needle = group_path_decoded.trim();
+    if needle.is_empty() {
+        return Vec::new();
+    }
+    config
+        .services
+        .iter()
+        .filter_map(|s| {
+            let g = s.group.as_deref()?.trim();
+            if g == needle {
+                Some(s.id.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn canonical_group_heading(config: &AppConfig, needle: &str) -> String {
+    let n = needle.trim();
+    for s in &config.services {
+        if let Some(ref g) = s.group {
+            let t = g.trim();
+            if t == n {
+                return t.to_string();
+            }
+        }
+    }
+    n.to_string()
+}
+
 #[derive(Template)]
 #[template(path = "dashboard.html", escape = "html")]
 struct DashboardTemplate {
     pub generated_at: String,
     pub heatmap: heatmap::HeatmapGrid,
     pub rows: Vec<DashboardRow>,
+    /// When set, heatmap and table are limited to this group (trimmed label).
+    pub active_group_filter: Option<String>,
 }
 
 #[derive(Template)]
@@ -149,6 +203,9 @@ struct DashboardDayTemplate {
 
 pub struct DashboardRow {
     pub service_id: String,
+    pub group: Option<String>,
+    /// Link to `/status/group/…` when `group` is set.
+    pub group_link_href: Option<String>,
     pub name: String,
     pub state: String,
     pub last_updated: String,
@@ -175,6 +232,50 @@ pub async fn status_dashboard(State(state): State<HttpState>, headers: HeaderMap
     let cfg = state.config.read().await.clone();
     let store = state.store.clone();
     let html = match tokio::task::spawn_blocking(move || render_dashboard(&store, &cfg)).await {
+        Ok(Ok(h)) => h,
+        Ok(Err(e)) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build status page: {e}"),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Task join error: {e}"),
+            )
+                .into_response();
+        }
+    };
+
+    html_ok(html)
+}
+
+pub async fn status_dashboard_group(
+    State(state): State<HttpState>,
+    Path(group): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let Some((user, pass)) = status_credentials(&state).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    if !basic_authorized(&headers, &user, &pass) {
+        return unauthorized_status();
+    }
+
+    let cfg = state.config.read().await.clone();
+    if service_ids_for_group_label(&cfg, &group).is_empty() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let store = state.store.clone();
+    let group_owned = group;
+    let html = match tokio::task::spawn_blocking(move || {
+        render_dashboard_inner(&store, &cfg, Some(group_owned.as_str()))
+    })
+    .await
+    {
         Ok(Ok(h)) => h,
         Ok(Err(e)) => {
             return (
@@ -257,7 +358,15 @@ pub async fn status_day_all(
     let store = state.store.clone();
     let day_owned = day.clone();
     let html = match tokio::task::spawn_blocking(move || {
-        render_day_page(&store, &cfg, &day_owned, None, "/status", "All services")
+        render_day_page(
+            &store,
+            &cfg,
+            &day_owned,
+            None,
+            None,
+            "/status",
+            "All services",
+        )
     })
     .await
     {
@@ -317,6 +426,68 @@ pub async fn status_day_service(
             &cfg,
             &day_owned,
             Some(sid_owned.as_str()),
+            None,
+            &back,
+            &subtitle,
+        )
+    })
+    .await
+    {
+        Ok(Ok(h)) => h,
+        Ok(Err(e)) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build day page: {e}"),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Task join error: {e}"),
+            )
+                .into_response();
+        }
+    };
+
+    html_ok(html)
+}
+
+pub async fn status_day_group(
+    State(state): State<HttpState>,
+    Path((group, day)): Path<(String, String)>,
+    headers: HeaderMap,
+) -> Response {
+    let Some((user, pass)) = status_credentials(&state).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    if !basic_authorized(&headers, &user, &pass) {
+        return unauthorized_status();
+    }
+    if parse_calendar_day(&day).is_none() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let cfg = state.config.read().await.clone();
+    let ids = service_ids_for_group_label(&cfg, &group);
+    if ids.is_empty() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let heading = canonical_group_heading(&cfg, &group);
+    let enc = encode_path_segment(&heading);
+    let back = format!("/status/group/{enc}");
+    let day_owned = day.clone();
+    let subtitle = format!("{heading} — {day_owned}");
+
+    let store = state.store.clone();
+    let html = match tokio::task::spawn_blocking(move || {
+        render_day_page(
+            &store,
+            &cfg,
+            &day_owned,
+            None,
+            Some((ids.as_slice(), enc.as_str())),
             &back,
             &subtitle,
         )
@@ -377,6 +548,34 @@ fn overview_heatmap(
     ))
 }
 
+fn overview_heatmap_for_service_set(
+    store: &Store,
+    config: &AppConfig,
+    service_ids: &[String],
+    encoded_group: &str,
+) -> crate::error::Result<heatmap::HeatmapGrid> {
+    let (range_start, range_end) = heatmap::heatmap_range_utc();
+    let from = range_start.format("%Y-%m-%d").to_string();
+    let to = range_end.format("%Y-%m-%d").to_string();
+    let events =
+        store.get_events_between_calendar_days_for_services(&from, &to, service_ids)?;
+    let worst = heatmap::worst_state_by_day(&events);
+    let names = service_name_map(config);
+    let tips = heatmap::build_overview_day_tips(&events, &names, range_start, range_end, &worst);
+    let enc = encoded_group.to_string();
+    Ok(heatmap::build_heatmap_grid(
+        &worst,
+        range_start,
+        range_end,
+        move |d| format!("/status/group/{}/day/{}", enc, d.format("%Y-%m-%d")),
+        move |d| {
+            tips.get(&d)
+                .cloned()
+                .unwrap_or_else(|| heatmap::tip_fallback(d))
+        },
+    ))
+}
+
 fn service_heatmap(store: &Store, service_id: &str) -> crate::error::Result<heatmap::HeatmapGrid> {
     let (range_start, range_end) = heatmap::heatmap_range_utc();
     let from = range_start.format("%Y-%m-%d").to_string();
@@ -395,16 +594,48 @@ fn service_heatmap(store: &Store, service_id: &str) -> crate::error::Result<heat
 }
 
 fn render_dashboard(store: &Store, config: &AppConfig) -> crate::error::Result<String> {
+    render_dashboard_inner(store, config, None)
+}
+
+fn render_dashboard_inner(
+    store: &Store,
+    config: &AppConfig,
+    active_group_filter: Option<&str>,
+) -> crate::error::Result<String> {
     let data = gather_cron_data(config, store)?;
     let names = service_name_map(config);
-    let heatmap = overview_heatmap(store, config)?;
+    let groups = service_group_map(config);
+
+    let group_service_ids: Option<Vec<String>> = active_group_filter
+        .map(|g| service_ids_for_group_label(config, g))
+        .filter(|ids| !ids.is_empty());
+
+    let heatmap = match (&group_service_ids, active_group_filter) {
+        (Some(ids), Some(g)) => {
+            let enc = encode_path_segment(&canonical_group_heading(config, g));
+            overview_heatmap_for_service_set(store, config, ids, &enc)?
+        }
+        _ => overview_heatmap(store, config)?,
+    };
+
+    let active_heading = active_group_filter
+        .map(|g| canonical_group_heading(config, g));
 
     let mut rows = Vec::new();
     for s in &data.services {
+        if let Some(ref ids) = group_service_ids {
+            if !ids.contains(&s.service_id) {
+                continue;
+            }
+        }
         let name = names
             .get(&s.service_id)
             .cloned()
             .unwrap_or_else(|| "Unknown".into());
+        let group = groups.get(&s.service_id).cloned();
+        let group_link_href = group
+            .as_ref()
+            .map(|label| format!("/status/group/{}", encode_path_segment(label)));
         let preview = store
             .get_latest_event_for_service(&s.service_id)?
             .and_then(|e| e.logs)
@@ -416,6 +647,8 @@ fn render_dashboard(store: &Store, config: &AppConfig) -> crate::error::Result<S
 
         rows.push(DashboardRow {
             service_id: s.service_id.clone(),
+            group,
+            group_link_href,
             name,
             state: s.state.as_str().to_string(),
             last_updated: s.last_updated.clone(),
@@ -427,6 +660,7 @@ fn render_dashboard(store: &Store, config: &AppConfig) -> crate::error::Result<S
         generated_at: chrono::Utc::now().to_rfc3339(),
         heatmap,
         rows,
+        active_group_filter: active_heading,
     };
     tpl.render()
         .map_err(|e| crate::error::Error::Other(e.to_string()))
@@ -474,16 +708,30 @@ fn render_day_page(
     config: &AppConfig,
     day: &str,
     service_id: Option<&str>,
+    group_day: Option<(&[String], &str)>,
     back_href: &str,
     subtitle: &str,
 ) -> crate::error::Result<String> {
     let names = service_name_map(config);
-    let raw = store.get_events_on_calendar_day(day, service_id)?;
+    let raw = if let Some(sid) = service_id {
+        store.get_events_on_calendar_day(day, Some(sid))?
+    } else if let Some((ids, _)) = group_day {
+        store.get_events_on_calendar_day_for_services(day, ids)?
+    } else {
+        store.get_events_on_calendar_day(day, None)?
+    };
     let events: Vec<DayLogRow> = raw.iter().map(|e| event_to_day_row(e, &names)).collect();
 
-    let heatmap = match service_id {
-        Some(sid) => service_heatmap(store, sid)?,
-        None => overview_heatmap(store, config)?,
+    let heatmap = if let Some(sid) = service_id {
+        service_heatmap(store, sid)?
+    } else if let Some((ids, enc)) = group_day {
+        if ids.is_empty() {
+            overview_heatmap(store, config)?
+        } else {
+            overview_heatmap_for_service_set(store, config, ids, enc)?
+        }
+    } else {
+        overview_heatmap(store, config)?
     };
 
     let tpl = DashboardDayTemplate {

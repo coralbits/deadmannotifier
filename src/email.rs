@@ -24,6 +24,7 @@ pub struct EmailTemplate<'a> {
 
 pub struct EmailServiceRow<'a> {
     pub name: &'a str,
+    pub group: Option<String>,
     pub state: &'a str,
     pub last_updated: &'a str,
     pub is_nak: bool,
@@ -45,6 +46,7 @@ pub fn build_email_html(
     services: &[CronServiceStatus],
     events: &[EventRow],
     names: &std::collections::HashMap<String, String>,
+    groups: &std::collections::HashMap<String, String>,
 ) -> Result<(String, String)> {
     let worst = worst_state_from_services(services);
     let worst_label = match worst {
@@ -65,6 +67,7 @@ pub fn build_email_html(
                 .unwrap_or("Unknown Service");
             EmailServiceRow {
                 name,
+                group: groups.get(&s.service_id).cloned(),
                 state: s.state.as_str(),
                 last_updated: &s.last_updated,
                 is_nak: s.state == ServiceState::Nak,

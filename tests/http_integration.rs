@@ -33,6 +33,9 @@ cron: "0 0 * * *"
 services:
   - id: "438c41d2-f4d8-4697-aaa6-ab7bfd02b07d"
     name: "Test Service"
+    group: "AlphaGroup"
+  - id: "a18c41d2-f4d8-4697-aaa6-ab7bfd02b07e"
+    name: "Other Service"
 status_ui:
   username: "dashuser"
   password: "dashpass"
@@ -164,4 +167,52 @@ async fn status_dashboard_auth_and_heatmap() {
     let html = String::from_utf8_lossy(&body);
     assert!(html.contains("Activity"));
     assert!(html.contains("heatmap"));
+}
+
+#[tokio::test]
+async fn status_group_filter_and_unknown_404() {
+    let dir = tempdir().unwrap();
+    let db = dir.path().join("t4.db");
+    let cfg = test_config(&db);
+    cfg.validate().unwrap();
+    let store = Store::open(&db).unwrap();
+    let state = HttpState {
+        config: Arc::new(RwLock::new(cfg)),
+        store,
+    };
+    let app = build_router(state);
+
+    let auth = basic_auth_header("dashuser", "dashpass");
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/status/group/NoSuchGroup")
+                .header(AUTHORIZATION, &auth)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/status/group/AlphaGroup")
+                .header(AUTHORIZATION, &auth)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    let html = String::from_utf8_lossy(&body);
+    assert!(html.contains("Test Service"));
+    assert!(html.contains("AlphaGroup"));
+    assert!(!html.contains("Other Service"));
+    assert!(html.contains("All services"));
 }

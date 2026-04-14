@@ -1,5 +1,7 @@
 use crate::config::AppConfig;
-use crate::cron_logic::{gather_cron_data, service_name_map, CronData};
+use crate::cron_logic::{
+    gather_cron_data, service_group_map, service_name_map, CronData,
+};
 use crate::db::Store;
 use crate::domain::ServiceState;
 use crate::email::{build_email_html, send_status_email, write_email_preview_file};
@@ -8,7 +10,11 @@ use crate::error::Result;
 pub const MARKER_SERVICE_ID: &str = "cron-job-marker";
 pub const CRON_JOB_MARKER: &str = "CRON_JOB_MARKER";
 
-pub fn log_cron_report(data: &CronData, names: &std::collections::HashMap<String, String>) {
+pub fn log_cron_report(
+    data: &CronData,
+    names: &std::collections::HashMap<String, String>,
+    groups: &std::collections::HashMap<String, String>,
+) {
     println!("\n=== DEAD MAN NOTIFIER REPORT ===");
     println!("Generated on: {}", chrono::Utc::now().to_rfc3339());
 
@@ -22,8 +28,13 @@ pub fn log_cron_report(data: &CronData, names: &std::collections::HashMap<String
                 .get(&s.service_id)
                 .map(String::as_str)
                 .unwrap_or("Unknown Service");
+            let group = groups
+                .get(&s.service_id)
+                .map(String::as_str)
+                .unwrap_or("—");
             println!(
-                "{:20} | {:3} | {}",
+                "{:14} | {:20} | {:3} | {}",
+                group,
                 name,
                 s.state.as_str().to_uppercase(),
                 s.last_updated
@@ -63,11 +74,12 @@ pub fn log_cron_report(data: &CronData, names: &std::collections::HashMap<String
 pub async fn run_cron_job(store: &Store, config: &AppConfig, test_mode: bool) -> Result<()> {
     let data = gather_cron_data(config, store)?;
     let names = service_name_map(config);
-    log_cron_report(&data, &names);
+    let groups = service_group_map(config);
+    log_cron_report(&data, &names, &groups);
 
     if test_mode {
         let (subject, html) =
-            build_email_html(&config.email, &data.services, &data.events, &names)?;
+            build_email_html(&config.email, &data.services, &data.events, &names, &groups)?;
         let path = write_email_preview_file(&html).await?;
         let url = format!("file://{}", path.display());
         println!("Email content written to: {url}");
@@ -77,7 +89,8 @@ pub async fn run_cron_job(store: &Store, config: &AppConfig, test_mode: bool) ->
         return Ok(());
     }
 
-    let (subject, html) = build_email_html(&config.email, &data.services, &data.events, &names)?;
+    let (subject, html) =
+        build_email_html(&config.email, &data.services, &data.events, &names, &groups)?;
     send_status_email(&config.email, &html, &subject).await?;
 
     store.mark_all_services_as_nak()?;

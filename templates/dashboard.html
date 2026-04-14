@@ -254,12 +254,18 @@
     <header class="border-b-2 p-4">
       <h1 class="m-0 uppercase font-bold">Dead Man Notifier</h1>
       <p class="m-0 mt-6 text-sm">Generated {{ generated_at }}</p>
+      {% if let Some(g) = active_group_filter %}
+        <p class="m-0 mt-6 text-sm">
+          View: <strong>{{ g }}</strong> —
+          <a class="nav" href="/status">All services</a>
+        </p>
+      {% endif %}
     </header>
     <main class="p-6">
       <h2 class="m-0 mb-4 uppercase border-2 p-4 bg-black">Activity (last 365 days)</h2>
       <p class="text-sm m-0 mb-4">
         White = no pings, green = ok, yellow = nok, red = nak. Rows are Mon → Sun. Click a
-        square for all services’ logs that day.
+        square for logs that day{% if active_group_filter.is_some() %} (this group only){% else %} for all services{% endif %}.
       </p>
       <div class="heatmap-outer">
         <div class="heatmap-scroll">
@@ -293,6 +299,7 @@
       <table class="w-full border-collapse border-2">
         <thead>
           <tr>
+            <th class="text-left uppercase">Group</th>
             <th class="text-left uppercase">Name</th>
             <th class="text-left uppercase">State</th>
             <th class="text-left uppercase">Last updated</th>
@@ -302,6 +309,17 @@
         <tbody>
           {% for row in rows %}
             <tr>
+              <td class="text-sm">
+                {% if let Some(g) = row.group %}
+                  {% if let Some(href) = row.group_link_href %}
+                    <a class="nav" href="{{ href }}">{{ g }}</a>
+                  {% else %}
+                    {{ g }}
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td class="font-bold">
                 <a class="svc-link" href="/status/service/{{ row.service_id }}">{{ row.name }}</a>
               </td>

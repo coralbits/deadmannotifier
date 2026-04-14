@@ -13,7 +13,8 @@ use crate::config::AppConfig;
 use crate::db::Store;
 
 use dashboard::{
-    redirect_root, status_dashboard, status_day_all, status_day_service, status_service,
+    redirect_root, status_dashboard, status_dashboard_group, status_day_all, status_day_group,
+    status_day_service, status_service,
 };
 use ping::{handle_ping_nok, handle_ping_ok};
 
@@ -29,6 +30,8 @@ pub fn build_router(state: HttpState) -> Router {
         .route("/", get(redirect_root))
         .route("/status/service/{sid}/day/{day}", get(status_day_service))
         .route("/status/service/{sid}", get(status_service))
+        .route("/status/group/{group}/day/{day}", get(status_day_group))
+        .route("/status/group/{group}", get(status_dashboard_group))
         .route("/status/day/{day}", get(status_day_all))
         .route("/status", get(status_dashboard))
         .route("/{id}/ok", put(handle_ping_ok))

@@ -40,6 +40,9 @@ pub struct EmailConfig {
 pub struct ServiceEntry {
     pub id: String,
     pub name: String,
+    /// Optional client or category label; used for ordering and display.
+    #[serde(default)]
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -118,6 +121,14 @@ impl AppConfig {
         for s in &self.services {
             if s.id.is_empty() || s.name.is_empty() {
                 return Err(Error::Config("each service must have id and name".into()));
+            }
+            if let Some(g) = &s.group {
+                if g.trim().is_empty() {
+                    return Err(Error::Config(format!(
+                        "service `{}`: group must not be blank when set",
+                        s.name
+                    )));
+                }
             }
             Uuid::parse_str(&s.id).map_err(|_| {
                 Error::Config(format!("invalid UUID format for service: {}", s.name))

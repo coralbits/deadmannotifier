@@ -50,14 +50,60 @@ pub fn gather_cron_data(config: &AppConfig, store: &Store) -> Result<CronData> {
         }
     }
 
+    let order: std::collections::HashMap<String, (u8, String, String, String)> = configured
+        .iter()
+        .map(|e| (e.id.clone(), service_sort_key(e)))
+        .collect();
+    services.sort_by(|a, b| order[&a.service_id].cmp(&order[&b.service_id]));
+    events.sort_by(|a, b| order[&a.service_id].cmp(&order[&b.service_id]));
+
     Ok(CronData { services, events })
+}
+
+/// Sort: non-empty `group` first (alphabetically by group, then name), ungrouped last.
+pub fn service_sort_key(entry: &ServiceEntry) -> (u8, String, String, String) {
+    let label = entry
+        .group
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    match label {
+        Some(g) => (
+            0,
+            g.to_lowercase(),
+            entry.name.to_lowercase(),
+            entry.id.clone(),
+        ),
+        None => (
+            1,
+            String::new(),
+            entry.name.to_lowercase(),
+            entry.id.clone(),
+        ),
+    }
 }
 
 pub fn service_name_map(config: &AppConfig) -> std::collections::HashMap<String, String> {
     config
         .services
         .iter()
-        .map(|ServiceEntry { id, name }| (id.clone(), name.clone()))
+        .map(|s| (s.id.clone(), s.name.clone()))
+        .collect()
+}
+
+/// Service id → trimmed group label (only entries that have a non-empty `group`).
+pub fn service_group_map(config: &AppConfig) -> std::collections::HashMap<String, String> {
+    config
+        .services
+        .iter()
+        .filter_map(|s| {
+            let g = s.group.as_deref()?.trim();
+            if g.is_empty() {
+                None
+            } else {
+                Some((s.id.clone(), g.to_string()))
+            }
+        })
         .collect()
 }
 

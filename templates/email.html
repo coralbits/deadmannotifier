@@ -30,6 +30,7 @@
       <table class="status-table">
         <thead>
           <tr>
+            <th>Group</th>
             <th>Service Name</th>
             <th>Status</th>
             <th>Last Updated</th>
@@ -38,6 +39,13 @@
         <tbody>
           {% for service in services %}
             <tr>
+              <td>
+                {% if let Some(g) = service.group %}
+                  {{ g }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td>{{ service.name }}</td>
               <td class="status-{{ service.state }}">
                 {% if service.is_nak %}

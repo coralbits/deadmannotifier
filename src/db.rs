@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, ToSql};
 
 use crate::domain::ServiceState;
 use crate::error::{Error, Result};
@@ -199,6 +199,39 @@ impl Store {
         Ok(out)
     }
 
+    /// Like [`Self::get_events_between_calendar_days`] but restricted to the given service IDs.
+    pub fn get_events_between_calendar_days_for_services(
+        &self,
+        from_day: &str,
+        to_day: &str,
+        service_ids: &[String],
+    ) -> Result<Vec<EventRow>> {
+        if service_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let conn = self
+            .inner
+            .lock()
+            .map_err(|_| Error::Other("database connection mutex poisoned".into()))?;
+        let in_list = service_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT id, service_id, state, timestamp, logs, source_ip FROM events
+             WHERE date(timestamp) >= date(?) AND date(timestamp) <= date(?)
+             AND service_id != 'cron-job-marker'
+             AND service_id IN ({in_list})
+             ORDER BY timestamp ASC",
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let mut bind: Vec<&dyn ToSql> = vec![&from_day, &to_day];
+        for id in service_ids {
+            bind.push(id);
+        }
+        let rows: Vec<EventRow> = stmt
+            .query_map(bind.as_slice(), event_row_from_sql)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     /// All events on a calendar day (`YYYY-MM-DD`), ordered by time.
     pub fn get_events_on_calendar_day(
         &self,
@@ -234,6 +267,38 @@ impl Store {
             rows
         };
         Ok(out)
+    }
+
+    /// Like [`Self::get_events_on_calendar_day`] but restricted to the given service IDs.
+    pub fn get_events_on_calendar_day_for_services(
+        &self,
+        day: &str,
+        service_ids: &[String],
+    ) -> Result<Vec<EventRow>> {
+        if service_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let conn = self
+            .inner
+            .lock()
+            .map_err(|_| Error::Other("database connection mutex poisoned".into()))?;
+        let in_list = service_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT id, service_id, state, timestamp, logs, source_ip FROM events
+             WHERE date(timestamp) = date(?)
+             AND service_id != 'cron-job-marker'
+             AND service_id IN ({in_list})
+             ORDER BY timestamp ASC",
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let mut bind: Vec<&dyn ToSql> = vec![&day];
+        for id in service_ids {
+            bind.push(id);
+        }
+        let rows: Vec<EventRow> = stmt
+            .query_map(bind.as_slice(), event_row_from_sql)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 
     pub fn mark_all_services_as_nak(&self) -> Result<usize> {

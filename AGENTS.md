@@ -14,7 +14,7 @@ Concise facts for future work on this repository.
 | [src/cron_logic.rs](src/cron_logic.rs)                                      | Pure “gather report snapshot” logic                            |
 | [src/cron_runner.rs](src/cron_runner.rs)                                    | Console report, email/test mode, NAK reset, cron marker insert |
 | [src/email.rs](src/email.rs) + [templates/email.html](templates/email.html) | HTML email                                                     |
-| [src/http/](src/http/)                                                      | Axum router, ping handlers; `/` → `/status`, dashboard + Basic auth on `/status` |
+| [src/http/](src/http/)                                                      | Axum router, ping handlers; `/` → `/status`, dashboard + Basic auth on `/status`; optional `GET /status/group/{group}` and `…/group/{group}/day/{day}` (percent-encoded segment, trim match on configured `services[].group`) |
 | [src/embedded_cron.rs](src/embedded_cron.rs)                                | `tokio-cron-scheduler` job                                     |
 | [src/watcher.rs](src/watcher.rs)                                            | `notify` debounced config reload                               |
 | [assets/schema.sql](assets/schema.sql)                                      | Idempotent DDL executed on open                                |

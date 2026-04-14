@@ -213,7 +213,11 @@ impl Store {
             .inner
             .lock()
             .map_err(|_| Error::Other("database connection mutex poisoned".into()))?;
-        let in_list = service_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let in_list = service_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
         let sql = format!(
             "SELECT id, service_id, state, timestamp, logs, source_ip FROM events
              WHERE date(timestamp) >= date(?) AND date(timestamp) <= date(?)
@@ -282,7 +286,11 @@ impl Store {
             .inner
             .lock()
             .map_err(|_| Error::Other("database connection mutex poisoned".into()))?;
-        let in_list = service_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let in_list = service_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
         let sql = format!(
             "SELECT id, service_id, state, timestamp, logs, source_ip FROM events
              WHERE date(timestamp) = date(?)

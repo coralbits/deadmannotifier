@@ -557,8 +557,7 @@ fn overview_heatmap_for_service_set(
     let (range_start, range_end) = heatmap::heatmap_range_utc();
     let from = range_start.format("%Y-%m-%d").to_string();
     let to = range_end.format("%Y-%m-%d").to_string();
-    let events =
-        store.get_events_between_calendar_days_for_services(&from, &to, service_ids)?;
+    let events = store.get_events_between_calendar_days_for_services(&from, &to, service_ids)?;
     let worst = heatmap::worst_state_by_day(&events);
     let names = service_name_map(config);
     let tips = heatmap::build_overview_day_tips(&events, &names, range_start, range_end, &worst);
@@ -618,8 +617,7 @@ fn render_dashboard_inner(
         _ => overview_heatmap(store, config)?,
     };
 
-    let active_heading = active_group_filter
-        .map(|g| canonical_group_heading(config, g));
+    let active_heading = active_group_filter.map(|g| canonical_group_heading(config, g));
 
     let mut rows = Vec::new();
     for s in &data.services {

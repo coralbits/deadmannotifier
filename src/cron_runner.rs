@@ -1,7 +1,5 @@
 use crate::config::AppConfig;
-use crate::cron_logic::{
-    gather_cron_data, service_group_map, service_name_map, CronData,
-};
+use crate::cron_logic::{gather_cron_data, service_group_map, service_name_map, CronData};
 use crate::db::Store;
 use crate::domain::ServiceState;
 use crate::email::{build_email_html, send_status_email, write_email_preview_file};
@@ -28,10 +26,7 @@ pub fn log_cron_report(
                 .get(&s.service_id)
                 .map(String::as_str)
                 .unwrap_or("Unknown Service");
-            let group = groups
-                .get(&s.service_id)
-                .map(String::as_str)
-                .unwrap_or("—");
+            let group = groups.get(&s.service_id).map(String::as_str).unwrap_or("—");
             println!(
                 "{:14} | {:20} | {:3} | {}",
                 group,

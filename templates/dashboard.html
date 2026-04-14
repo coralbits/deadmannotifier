@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dead Man Notifier — Status</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        background: #fff;
+        color: #000;
+        line-height: 1.35;
+      }
+      .border-2 {
+        border: 2px solid #000;
+      }
+      .border-b-2 {
+        border-bottom: 2px solid #000;
+      }
+      .p-4 {
+        padding: 1rem;
+      }
+      .p-6 {
+        padding: 1.5rem;
+      }
+      .m-0 {
+        margin: 0;
+      }
+      .mb-4 {
+        margin-bottom: 1rem;
+      }
+      .mt-6 {
+        margin-top: 1.5rem;
+      }
+      .uppercase {
+        text-transform: uppercase;
+      }
+      .text-sm {
+        font-size: 0.85rem;
+      }
+      .font-bold {
+        font-weight: 700;
+      }
+      .w-full {
+        width: 100%;
+      }
+      .border-collapse {
+        border-collapse: collapse;
+      }
+      .text-left {
+        text-align: left;
+      }
+      .bg-black {
+        background: #000;
+        color: #fff;
+      }
+      .state-ok {
+        background: #000;
+        color: #fff;
+      }
+      .state-nok {
+        background: #fff;
+        color: #000;
+      }
+      .state-nak {
+        background: #000;
+        color: #f00;
+        font-weight: 800;
+      }
+      th,
+      td {
+        border: 2px solid #000;
+        padding: 0.5rem 0.6rem;
+        vertical-align: top;
+      }
+      thead th {
+        letter-spacing: 0.04em;
+      }
+      .log-preview {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="border-b-2 p-4">
+      <h1 class="m-0 uppercase font-bold">Dead Man Notifier</h1>
+      <p class="m-0 mt-6 text-sm">Generated {{ generated_at }}</p>
+    </header>
+    <main class="p-6">
+      <h2 class="m-0 mb-4 uppercase border-2 p-4 bg-black">Services</h2>
+      <table class="w-full border-collapse border-2">
+        <thead>
+          <tr>
+            <th class="text-left uppercase">Name</th>
+            <th class="text-left uppercase">State</th>
+            <th class="text-left uppercase">Last updated</th>
+            <th class="text-left uppercase">Latest log (preview)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td class="font-bold">{{ row.name }}</td>
+              <td class="state-{{ row.state }} uppercase">{{ row.state }}</td>
+              <td class="text-sm">{{ row.last_updated }}</td>
+              <td class="text-sm log-preview">{{ row.log_preview }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </main>
+  </body>
+</html>

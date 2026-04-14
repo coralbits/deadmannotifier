@@ -9,64 +9,23 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
+          components: rustfmt, clippy
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
-      - name: Run unit tests
-        run: npm run test:unit
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
 
-      - name: Run integration tests
-        run: npm run test:integration
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
 
-      - name: Run all tests
-        run: npm test
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-node-${{ matrix.node-version }}
-          path: |
-            test-results.xml
-            coverage/
-          retention-days: 30
-
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20.x"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linting (if available)
-        run: |
-          if npm run lint --dry-run 2>/dev/null; then
-            npm run lint
-          else
-            echo "No linting configured, skipping..."
-          fi
-        continue-on-error: true
+      - name: cargo test
+        run: cargo test --locked

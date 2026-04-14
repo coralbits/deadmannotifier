@@ -1,7 +1,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>{{subject}}</title>
+    <title>{{ subject }}</title>
     <style>
       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333;
       max-width: 800px; margin: 0 auto; padding: 20px; } .header {
@@ -21,12 +21,12 @@
   </head>
   <body>
     <div class="header">
-      <h1>{{subject}}</h1>
-      <p>Generated on {{timestamp}}</p>
+      <h1>{{ subject }}</h1>
+      <p>Generated on {{ timestamp }}</p>
     </div>
 
     <h2>Service Status Summary</h2>
-    {{#if services}}
+    {% if !services.is_empty() %}
       <table class="status-table">
         <thead>
           <tr>
@@ -36,46 +36,42 @@
           </tr>
         </thead>
         <tbody>
-          {{#each services}}
+          {% for service in services %}
             <tr>
-              <td>{{name}}</td>
-              <td class="status-{{state}}">
-                {{#if (eq state "nak")}}
-                  ⚠️
-                  {{state}}
-                  (MISSING!)
-                {{else}}
-                  {{state}}
-                {{/if}}
+              <td>{{ service.name }}</td>
+              <td class="status-{{ service.state }}">
+                {% if service.is_nak %}
+                  ⚠️ {{ service.state }} (MISSING!)
+                {% else %}
+                  {{ service.state }}
+                {% endif %}
               </td>
-              <td>{{lastUpdated}}</td>
+              <td>{{ service.last_updated }}</td>
             </tr>
-          {{/each}}
+          {% endfor %}
         </tbody>
       </table>
-    {{else}}
+    {% else %}
       <p>No services configured.</p>
-    {{/if}}
+    {% endif %}
 
-    {{#if hasLogs}}
+    {% if has_logs %}
       <h2>Recent Logs</h2>
-      {{#each logs}}
+      {% for log in logs %}
         <div class="logs">
-          <strong>{{serviceName}} ({{state}})</strong>
+          <strong>{{ log.service_name }} ({{ log.state }})</strong>
           <hr />
-          {{timestamp}}
-          {{#if logs}}
-            <pre>
-              {{logs}}
-            </pre>
-          {{/if}}
+          {{ log.timestamp }}
+          {% if let Some(l) = log.logs %}
+            <pre>{{ l }}</pre>
+          {% endif %}
         </div>
-      {{/each}}
-    {{/if}}
+      {% endfor %}
+    {% endif %}
 
     <div class="footer">
       <p>This is an automated message from Dead Man Notifier.</p>
-      <p>Worst state detected: <strong>{{worstState}}</strong></p>
+      <p>Worst state detected: <strong>{{ worst_state }}</strong></p>
     </div>
   </body>
 </html>

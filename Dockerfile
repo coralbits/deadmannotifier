@@ -1,37 +1,39 @@
-FROM node:18-alpine
+# syntax=docker/dockerfile:1
 
-# Set working directory
+FROM rust:1-bookworm AS builder
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy package files
-COPY package*.json ./
+COPY Cargo.toml Cargo.lock ./
+COPY assets ./assets/
+COPY templates ./templates/
+COPY src ./src/
 
-# Install dependencies
-RUN npm ci --only=production
+RUN cargo build --locked --release
 
-# Copy source code
-COPY src/ ./src/
-COPY config.yaml ./
-COPY run.sh ./
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S deadman -u 1001
+WORKDIR /app
+COPY --from=builder /app/target/release/dms /usr/local/bin/dms
+COPY run.sh /app/run.sh
+COPY config.yaml /app/config.yaml
 
-# Change ownership of the app directory
-RUN chown -R deadman:nodejs /app
-RUN chmod +x /app/run.sh
+RUN addgroup --system --gid 1001 deadman \
+    && adduser --system --uid 1001 --ingroup deadman deadman \
+    && chmod +x /app/run.sh \
+    && chown -R deadman:deadman /app
+
 USER deadman
-
-# Expose port
 EXPOSE 3000
 
-# Set environment variables
-ENV NODE_ENV=production
+ENV RUST_LOG=info
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+    CMD curl -fsS http://127.0.0.1:3000/health >/dev/null || exit 1
 
-# Default command
-CMD ["./run.sh"]
+CMD ["/app/run.sh"]

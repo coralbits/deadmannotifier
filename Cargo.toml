@@ -1,0 +1,61 @@
+[package]
+name = "deadmannotifier"
+version = "1.0.0"
+edition = "2021"
+description = "Dead Man Notifier — service health pings and email reports"
+license = "MIT"
+repository = "https://github.com/coralbits/deadmannotifier"
+default-run = "dms"
+
+[[bin]]
+name = "dms"
+path = "src/main.rs"
+
+[lib]
+name = "deadmannotifier"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+askama = "0.12"
+axum = { version = "0.8", features = ["macros", "json"] }
+base64 = "0.22"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+lettre = { version = "0.11", default-features = false, features = [
+    "tokio1",
+    "tokio1-native-tls",
+    "smtp-transport",
+    "builder",
+] }
+notify = "6"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+subtle = "2"
+thiserror = "1"
+tokio = { version = "1", features = [
+    "macros",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+    "time",
+    "fs",
+] }
+tokio-cron-scheduler = "0.13"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
+
+[lints.rust]
+unsafe_code = "forbid"

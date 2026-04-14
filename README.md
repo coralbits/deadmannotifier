@@ -1,271 +1,113 @@
 # Dead Man Notifier
 
-A REST service for monitoring service health with email notifications.
+Rust service for monitoring backup and automation jobs with SQLite storage, optional email reports, and an optional password-protected HTML status page.
 
-## Quick Start
+## Requirements
 
-1. **Install dependencies:**
+- Rust toolchain (stable), or use the provided Dockerfile.
 
-   ```bash
-   npm install
-   ```
-
-2. **Configure the service:**
-   Edit `config.yaml` with your server, database, email settings and services.
-
-3. **Start the server:**
-
-   ```bash
-   npm start
-   # or
-   node src/index.js serve
-   ```
-
-4. **Test a service ping:**
-
-   ```bash
-   curl -X PUT http://localhost:3000/438c41d2-f4d8-4697-aaa6-ab7bfd02b07d/ok
-   ```
-
-5. **Send logs with a file:**
-
-   ```bash
-   # Correct way - preserves newlines and special characters
-   curl -X PUT http://localhost:3000/438c41d2-f4d8-4697-aaa6-ab7bfd02b07d/ok --data-binary @logfile.txt
-
-   # Alternative - with explicit content type
-   curl -X PUT http://localhost:3000/438c41d2-f4d8-4697-aaa6-ab7bfd02b07d/ok \
-     -H "Content-Type: text/plain" \
-     --data-binary @logfile.txt
-   ```
-
-   **Note**: Using `-d @file` will URL-encode the content and convert newlines to literal `\n` characters, which may not display correctly in logs.
-
-## CLI Commands
-
-- `dms serve` - Start the REST server
-- `dms list` - Show current service states
-- `dms logs` - Show latest events
-- `dms cron` - Start cron job service
-- `dms cron --init` - Setup system cron entry
-
-### Command Line Options
-
-All commands support the `-c, --config <path>` option to specify a custom config file:
+## Quick start
 
 ```bash
-dms serve --config /data/config.yaml
-dms list --config /etc/deadman/config.yaml
-dms logs --config /data/config.yaml
-dms cron --config /data/config.yaml
+cargo build --release
+./target/release/dms serve --config config.yaml
 ```
 
-The `serve` command also supports:
-
-- `-h, --host <host>` - Override the host from config
-- `-p, --port <port>` - Override the port from config
-- `--with-cron` - Enable embedded cron job (overrides config setting)
-- `--watch` - Watch config file for changes and reload automatically
+Ping a configured service (replace UUID with one from your `config.yaml`):
 
 ```bash
-dms serve --host 127.0.0.1 --port 8080
-dms serve --config /data/config.yaml --host 0.0.0.0 --port 3000
-dms serve --with-cron  # Enable embedded cron job
-dms serve --watch      # Watch config file for changes
+curl -X PUT http://localhost:3000/438c41d2-f4d8-4697-aaa6-ab7bfd02b07d/ok
 ```
 
-### Config File Watching
-
-When using the `--watch` flag, the server will automatically reload the configuration when the config file changes:
+Send logs with a file (preserves newlines):
 
 ```bash
-dms serve --watch
+curl -X PUT http://localhost:3000/438c41d2-f4d8-4697-aaa6-ab7bfd02b07d/ok --data-binary @logfile.txt
 ```
 
-**Features:**
+## CLI (`dms`)
 
-- **Automatic reload**: Config changes are detected and applied without restarting the server
-- **Debounced updates**: Rapid file changes are debounced to prevent excessive reloads
-- **Cron service restart**: Embedded cron service is restarted with new config
-- **Error handling**: Invalid config changes are logged but don't crash the server
-- **Visual feedback**: Clear status messages show when config is being reloaded
+| Command     | Description                                                      |
+| ----------- | ---------------------------------------------------------------- |
+| `dms serve` | HTTP server (`GET /health`, `PUT /{uuid}/ok`, `PUT /{uuid}/nok`; optional `/` → `/status` dashboard) |
+| `dms list`  | Print configured services and last known state                   |
+| `dms logs`  | Latest stored event per configured service                       |
+| `dms cron`  | Run one report cycle (email + reset) or `--init` / `--test`      |
 
-**Example output:**
+Global option: `-c, --config <path>` (default `config.yaml`).
 
+`serve` options:
+
+- `-H, --host` — bind host (overrides config)
+- `-p, --port` — bind port (overrides config)
+- `--with-cron` — force embedded cron on for this process (initial load only)
+- `--watch` — watch the config file; reload on change and restart embedded cron when enabled
+
+Note: `-h` is reserved for help; use `-H` or `--host` for the host override (differs from the old Node CLI).
+
+## Configuration (`config.yaml`)
+
+The server reads a single YAML file (default `config.yaml`, override with `-c` / `--config`). It must define:
+
+- **`server`**: `host`, `port`; optional `with_cron`, `external_url`
+- **`database`**: `path` to the SQLite file
+- **`email`**: `from`, `to`, `subject`, and `smtp` (`host`, `port`, `user`, `password`)
+- **`cron`**: schedule string for embedded reports (when `with_cron` is enabled)
+- **`services`**: list of `{ id: <UUID>, name: <string> }` for each monitored job
+
+Optional fields such as `email.body` are accepted for compatibility but ignored unless documented elsewhere.
+
+Full field reference: [docs/CONFIG.md](docs/CONFIG.md).
+
+## Web dashboard (status UI)
+
+When **`status_ui`** is configured with both **`username`** and **`password`**, the HTTP server exposes a small **HTML dashboard** (monospace, high-contrast layout) that lists every configured service with its current state, last update time, and a one-line preview of the latest stored log.
+
+**URLs and auth**
+
+1. Open **`http://<host>:<port>/`** in a browser (same host/port as `server` in YAML, or your reverse proxy).
+2. The server responds with **`302`** to **`/status`** (no credentials required for that redirect).
+3. **`GET /status`** is protected with **HTTP Basic authentication**. The browser then prompts for **username** and **password**; these must match `status_ui.username` and `status_ui.password` in your config file.
+
+If `status_ui` is omitted or either field is empty, **`GET /`** and **`GET /status`** return **404** (you still have `/health` and the ping routes).
+
+With **`dms serve --watch`**, a successful config reload updates the in-memory YAML. **Username, password, and turning the dashboard on or off** are read from that config on **each request**, so changes to `status_ui` apply immediately after reload (no process restart).
+
+**Minimal `status_ui` block** (add at the top level of `config.yaml`, next to `server` / `email`):
+
+```yaml
+status_ui:
+  username: "admin"
+  password: "use-a-strong-secret"
 ```
-Starting Dead Man Notifier server...
-Config Watch: enabled
-Watching config file: /path/to/config.yaml
 
-🔄 Config file changed, reloading...
-✅ Config reloaded successfully
-🔄 Restarting embedded cron service...
-✅ Embedded cron service restarted
-✅ Server reloaded successfully
-```
-
-### Embedded Cron Service
-
-The server can run with an embedded cron service that automatically sends status emails at the configured schedule. This can be enabled in two ways:
-
-1. **Via config file** - Set `with_cron: true` in the server section
-2. **Via command line** - Use the `--with-cron` flag
-
-When enabled, the server will:
-
-- Start the REST API server
-- Automatically run cron jobs at the configured schedule
-- Send email reports with service status
-- Handle graceful shutdown of both services
+Use a dedicated non-production password in repos; prefer secrets injection or a private config file in production. See also [AGENTS.md](AGENTS.md) (security notes).
 
 ## Docker
 
-### Building the Image
-
-Build the Docker image:
-
 ```bash
 docker build -t deadmannotifier .
-```
-
-Or use the provided Makefile:
-
-```bash
+# or
 make docker-build
 ```
 
-### Running with Docker
-
-Image is available at: ghcr.io/coralbits/deadmannotifier:latest
-
-Run the container with volume mounts for configuration and data persistence:
-
-```bash
-docker run -d \
-  --name deadman-notifier \
-  -p 3000:3000 \
-  -v $(pwd)/data:/app/data \
-  ghcr.io/coralbits/deadmannotifier:latest
-```
-
-Or use the Makefile:
-
-```bash
-make docker-run
-```
-
-### Docker Compose
-
-For easier management, use Docker Compose. You can use the provided docker-compose.yml
-file as an example to start the service.
-
-Start with Docker Compose:
-
-```bash
-docker-compose up -d
-```
-
-Stop the services:
-
-```bash
-docker-compose down
-```
-
-### Using Pre-built Images
-
-You can also use pre-built images from GitHub Container Registry:
-
-```yaml
-version: "3.8"
-
-services:
-  deadman-notifier:
-    image: ghcr.io/your-username/deadmannotifier:latest
-    container_name: deadman-notifier
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./data:/app/data
-    environment:
-      - NODE_ENV=production
-    restart: unless-stopped
-```
-
-### Docker Management Commands
-
-The Makefile provides convenient Docker management commands:
-
-```bash
-make docker-build          # Build the image
-make docker-run            # Run the container
-make docker-run-interactive # Run interactively
-make docker-stop           # Stop the container
-make docker-start          # Start the container
-make docker-remove         # Remove the container
-make docker-logs           # Show container logs
-make docker-shell          # Open shell in container
-make docker-clean          # Stop and remove container
-make docker-clean-all      # Remove container and image
-make docker-list           # List service status
-```
+Run (see [run.sh](run.sh)): the container copies the example config into `/app/data/config.yaml` on first start and runs `dms serve --config /app/data/config.yaml --watch`.
 
 ## Testing
 
-Run tests:
-
 ```bash
-npm test
-npm run test:unit
-npm run test:integration
+cargo test
+cargo fmt --all -- --check
+cargo clippy --all-targets -- -D warnings
 ```
 
-## Configuration
+## Documentation
 
-See `config.yaml` for configuration options. The file includes:
+- [PROGRESS.md](PROGRESS.md) — migration and feature checklist
+- [AGENTS.md](AGENTS.md) — notes for future development
+- [docs/CONFIG.md](docs/CONFIG.md) — configuration reference
+- [docs/DATABASE.md](docs/DATABASE.md) — SQLite schema and semantics
 
-- **Server settings**: host, port, embedded cron option, and external URL
-- **Database settings**: SQLite database path
-- **Email SMTP settings**: SMTP server configuration for notifications
-- **Cron schedule**: When to send periodic reports
-- **Service definitions**: UUIDs and names for monitored services
+## License
 
-Example configuration:
-
-```yaml
-server:
-  host: "0.0.0.0"
-  port: 3000
-  with_cron: false # Enable embedded cron service
-  external_url: "https://deadman.example.com" # Optional external URL for service pings
-
-database:
-  path: "deadman.db"
-
-email:
-  from: "alerts@example.com"
-  to: "admin@example.com"
-  subject: "Service Status Report"
-  smtp:
-    host: "smtp.example.com"
-    port: 587
-    user: "alerts@example.com"
-    password: "your-password"
-
-cron: "0 */6 * * *" # Every 6 hours
-
-services:
-  - id: "550e8400-e29b-41d4-a716-446655440000"
-    name: "Database Backup"
-  - id: "550e8400-e29b-41d4-a716-446655440001"
-    name: "File Sync Service"
-```
-
-## Usage
-
-Services ping the notifier with:
-
-- `PUT /[service-id]/ok` - Service is healthy
-- `PUT /[service-id]/nok` - Service has issues
-
-The cron job sends periodic email reports and marks services as "nak" (not acknowledged) if they haven't pinged within the cron period.
+MIT — see [LICENSE.md](LICENSE.md).

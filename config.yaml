@@ -27,3 +27,8 @@ services:
     name: "Backup docker"
   - id: 438c41d2-f4d8-4697-aaa6-ab7bfd02b07f
     name: "Database Sync"
+
+# Optional: web dashboard — GET / redirects to GET /status (HTTP Basic). Omit to disable.
+status_ui:
+  username: "admin"
+  password: "changeme"

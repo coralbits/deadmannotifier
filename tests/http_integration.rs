@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use axum::body::Body;
+use axum::http::header::AUTHORIZATION;
 use axum::http::{Request, StatusCode};
+use base64::Engine;
 use deadmannotifier::config::AppConfig;
 use deadmannotifier::db::Store;
 use deadmannotifier::http::{build_router, HttpState};
@@ -31,6 +33,9 @@ cron: "0 0 * * *"
 services:
   - id: "438c41d2-f4d8-4697-aaa6-ab7bfd02b07d"
     name: "Test Service"
+status_ui:
+  username: "dashuser"
+  password: "dashpass"
 "#,
         db_path.display()
     );
@@ -108,4 +113,55 @@ async fn put_ok_and_not_found() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+fn basic_auth_header(user: &str, pass: &str) -> String {
+    let creds = format!("{user}:{pass}");
+    format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD.encode(creds.as_bytes())
+    )
+}
+
+#[tokio::test]
+async fn status_dashboard_auth_and_heatmap() {
+    let dir = tempdir().unwrap();
+    let db = dir.path().join("t3.db");
+    let cfg = test_config(&db);
+    cfg.validate().unwrap();
+    let store = Store::open(&db).unwrap();
+    let state = HttpState {
+        config: Arc::new(RwLock::new(cfg)),
+        store,
+    };
+    let app = build_router(state);
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/status")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/status")
+                .header(AUTHORIZATION, basic_auth_header("dashuser", "dashpass"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    let html = String::from_utf8_lossy(&body);
+    assert!(html.contains("Activity"));
+    assert!(html.contains("heatmap"));
 }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dead Man Notifier — Status</title>
+    <title>{{ day }} — Logs</title>
     <style>
       :root {
         color-scheme: light;
@@ -49,51 +49,12 @@
       .font-bold {
         font-weight: 700;
       }
-      .w-full {
-        width: 100%;
-      }
-      .border-collapse {
-        border-collapse: collapse;
-      }
-      .text-left {
-        text-align: left;
-      }
       .bg-black {
         background: #000;
         color: #fff;
       }
-      .state-ok {
-        background: #2da44e;
-        color: #fff;
-      }
-      .state-nok {
-        background: #d4a72c;
-        color: #000;
-      }
-      .state-nak {
-        background: #cf222e;
-        color: #fff;
-        font-weight: 800;
-      }
-      th,
-      td {
-        border: 2px solid #000;
-        padding: 0.5rem 0.6rem;
-        vertical-align: top;
-      }
-      thead th {
-        letter-spacing: 0.04em;
-      }
-      .log-preview {
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
       a.nav {
         color: #00e;
-        text-decoration: underline;
-      }
-      a.svc-link {
-        color: inherit;
         text-decoration: underline;
       }
       .heatmap-outer {
@@ -248,18 +209,54 @@
       .tip-ok {
         color: #14532a;
       }
+      .event {
+        border: 2px solid #000;
+        margin-bottom: 1rem;
+        padding: 0.75rem 1rem;
+      }
+      .event-meta {
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+      .state-ok {
+        background: #2da44e;
+        color: #fff;
+        padding: 0.1em 0.35em;
+      }
+      .state-nok {
+        background: #d4a72c;
+        color: #000;
+        padding: 0.1em 0.35em;
+      }
+      .state-nak {
+        background: #cf222e;
+        color: #fff;
+        font-weight: 800;
+        padding: 0.1em 0.35em;
+      }
+      pre.logs {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.8rem;
+        max-height: 24rem;
+        overflow: auto;
+        border-top: 1px solid #000;
+        padding-top: 0.5rem;
+      }
     </style>
   </head>
   <body>
     <header class="border-b-2 p-4">
-      <h1 class="m-0 uppercase font-bold">Dead Man Notifier</h1>
-      <p class="m-0 mt-6 text-sm">Generated {{ generated_at }}</p>
+      <p class="m-0 text-sm"><a class="nav" href="{{ back_href }}">← Back</a></p>
+      <h1 class="m-0 mt-6 uppercase font-bold">{{ day }}</h1>
+      <p class="m-0 mt-6 text-sm">{{ subtitle }}</p>
     </header>
     <main class="p-6">
       <h2 class="m-0 mb-4 uppercase border-2 p-4 bg-black">Activity (last 365 days)</h2>
       <p class="text-sm m-0 mb-4">
         White = no pings, green = ok, yellow = nok, red = nak. Rows are Mon → Sun. Click a
-        square for all services’ logs that day.
+        square to open that day’s logs.
       </p>
       <div class="heatmap-outer">
         <div class="heatmap-scroll">
@@ -289,29 +286,28 @@
         </div>
       </div>
 
-      <h2 class="m-0 mb-4 uppercase border-2 p-4 bg-black">Services</h2>
-      <table class="w-full border-collapse border-2">
-        <thead>
-          <tr>
-            <th class="text-left uppercase">Name</th>
-            <th class="text-left uppercase">State</th>
-            <th class="text-left uppercase">Last updated</th>
-            <th class="text-left uppercase">Latest log (preview)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in rows %}
-            <tr>
-              <td class="font-bold">
-                <a class="svc-link" href="/status/service/{{ row.service_id }}">{{ row.name }}</a>
-              </td>
-              <td class="state-{{ row.state }} uppercase">{{ row.state }}</td>
-              <td class="text-sm">{{ row.last_updated }}</td>
-              <td class="text-sm log-preview">{{ row.log_preview }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <h2 class="m-0 mb-4 uppercase border-2 p-4 bg-black">Events</h2>
+      {% if events.is_empty() %}
+        <p class="text-sm m-0">No events recorded for this day (cron marker excluded).</p>
+      {% endif %}
+      {% for ev in events %}
+        <article class="event">
+          <div class="event-meta">
+            <span class="font-bold">{{ ev.timestamp }}</span>
+            —
+            <a class="nav" href="/status/service/{{ ev.service_id }}">{{ ev.service_name }}</a>
+            —
+            <span class="state-{{ ev.state }} uppercase">{{ ev.state }}</span>
+            —
+            <span class="text-sm">{{ ev.source_ip }}</span>
+          </div>
+          {% if ev.logs != "" %}
+            <pre class="logs">{{ ev.logs }}</pre>
+          {% else %}
+            <p class="m-0 text-sm">(no log body)</p>
+          {% endif %}
+        </article>
+      {% endfor %}
     </main>
   </body>
 </html>

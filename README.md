@@ -61,13 +61,15 @@ Full field reference: [docs/CONFIG.md](docs/CONFIG.md).
 
 ## Web dashboard (status UI)
 
-When **`status_ui`** is configured with both **`username`** and **`password`**, the HTTP server exposes a small **HTML dashboard** (monospace, high-contrast layout) that lists every configured service with its current state, last update time, and a one-line preview of the latest stored log.
+When **`status_ui`** is configured with both **`username`** and **`password`**, the HTTP server exposes a small **HTML dashboard** (monospace, high-contrast layout) that lists every configured service with its current state, last update time, and a one-line preview of the latest stored log. It also shows a **365-day activity heatmap** (GitHub-style grid: one row per weekday from Monday to Sunday). White cells mean no pings that day; green / yellow / red are the worst state seen that day across pings (**ok** / **nok** / **nak**). Click a cell to open **all log events for that calendar day**; click a service name to see the same heatmap **for that service only**, with cells linking to that service’s day log view.
 
 **URLs and auth**
 
 1. Open **`http://<host>:<port>/`** in a browser (same host/port as `server` in YAML, or your reverse proxy).
 2. The server responds with **`302`** to **`/status`** (no credentials required for that redirect).
 3. **`GET /status`** is protected with **HTTP Basic authentication**. The browser then prompts for **username** and **password**; these must match `status_ui.username` and `status_ui.password` in your config file.
+
+Additional paths (same Basic auth, same 404 when `status_ui` is disabled): **`GET /status/service/{service-uuid}`** (per-service heatmap), **`GET /status/day/{YYYY-MM-DD}`** (all services’ events that day), **`GET /status/service/{service-uuid}/day/{YYYY-MM-DD}`** (one service’s events that day).
 
 If `status_ui` is omitted or either field is empty, **`GET /`** and **`GET /status`** return **404** (you still have `/health` and the ping routes).
 

@@ -1,4 +1,5 @@
 mod dashboard;
+mod heatmap;
 mod ping;
 
 use std::sync::Arc;
@@ -11,7 +12,9 @@ use tower_http::trace::TraceLayer;
 use crate::config::AppConfig;
 use crate::db::Store;
 
-use dashboard::{redirect_root, status_dashboard};
+use dashboard::{
+    redirect_root, status_dashboard, status_day_all, status_day_service, status_service,
+};
 use ping::{handle_ping_nok, handle_ping_ok};
 
 #[derive(Clone)]
@@ -24,6 +27,9 @@ pub fn build_router(state: HttpState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/", get(redirect_root))
+        .route("/status/service/{sid}/day/{day}", get(status_day_service))
+        .route("/status/service/{sid}", get(status_service))
+        .route("/status/day/{day}", get(status_day_all))
         .route("/status", get(status_dashboard))
         .route("/{id}/ok", put(handle_ping_ok))
         .route("/{id}/nok", put(handle_ping_nok))

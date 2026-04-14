@@ -25,6 +25,17 @@ pub struct CurrentStateRow {
     pub last_updated: String,
 }
 
+fn event_row_from_sql(r: &rusqlite::Row<'_>) -> rusqlite::Result<EventRow> {
+    Ok(EventRow {
+        id: r.get(0)?,
+        service_id: r.get(1)?,
+        state: r.get(2)?,
+        timestamp: r.get(3)?,
+        logs: r.get(4)?,
+        source_ip: r.get(5)?,
+    })
+}
+
 #[derive(Clone)]
 pub struct Store {
     inner: Arc<std::sync::Mutex<Connection>>,
@@ -147,6 +158,82 @@ impl Store {
                 })
             })
             .optional()?)
+    }
+
+    /// Events with `date(timestamp)` in `[from_day, to_day]` inclusive (YYYY-MM-DD, UTC calendar).
+    /// Excludes `cron-job-marker` rows. If `service_id` is set, filter to that service only.
+    pub fn get_events_between_calendar_days(
+        &self,
+        from_day: &str,
+        to_day: &str,
+        service_id: Option<&str>,
+    ) -> Result<Vec<EventRow>> {
+        let conn = self
+            .inner
+            .lock()
+            .map_err(|_| Error::Other("database connection mutex poisoned".into()))?;
+        let out: Vec<EventRow> = if let Some(sid) = service_id {
+            let mut stmt = conn.prepare(
+                "SELECT id, service_id, state, timestamp, logs, source_ip FROM events
+             WHERE date(timestamp) >= date(?1) AND date(timestamp) <= date(?2)
+             AND service_id != 'cron-job-marker'
+             AND service_id = ?3
+             ORDER BY timestamp ASC",
+            )?;
+            let rows: Vec<EventRow> = stmt
+                .query_map(params![from_day, to_day, sid], event_row_from_sql)?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            rows
+        } else {
+            let mut stmt = conn.prepare(
+                "SELECT id, service_id, state, timestamp, logs, source_ip FROM events
+             WHERE date(timestamp) >= date(?1) AND date(timestamp) <= date(?2)
+             AND service_id != 'cron-job-marker'
+             ORDER BY timestamp ASC",
+            )?;
+            let rows: Vec<EventRow> = stmt
+                .query_map(params![from_day, to_day], event_row_from_sql)?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            rows
+        };
+        Ok(out)
+    }
+
+    /// All events on a calendar day (`YYYY-MM-DD`), ordered by time.
+    pub fn get_events_on_calendar_day(
+        &self,
+        day: &str,
+        service_id: Option<&str>,
+    ) -> Result<Vec<EventRow>> {
+        let conn = self
+            .inner
+            .lock()
+            .map_err(|_| Error::Other("database connection mutex poisoned".into()))?;
+        let out: Vec<EventRow> = if let Some(sid) = service_id {
+            let mut stmt = conn.prepare(
+                "SELECT id, service_id, state, timestamp, logs, source_ip FROM events
+             WHERE date(timestamp) = date(?1)
+             AND service_id != 'cron-job-marker'
+             AND service_id = ?2
+             ORDER BY timestamp ASC",
+            )?;
+            let rows: Vec<EventRow> = stmt
+                .query_map(params![day, sid], event_row_from_sql)?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            rows
+        } else {
+            let mut stmt = conn.prepare(
+                "SELECT id, service_id, state, timestamp, logs, source_ip FROM events
+             WHERE date(timestamp) = date(?1)
+             AND service_id != 'cron-job-marker'
+             ORDER BY timestamp ASC",
+            )?;
+            let rows: Vec<EventRow> = stmt
+                .query_map(params![day], event_row_from_sql)?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            rows
+        };
+        Ok(out)
     }
 
     pub fn mark_all_services_as_nak(&self) -> Result<usize> {

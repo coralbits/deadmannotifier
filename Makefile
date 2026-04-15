@@ -9,14 +9,18 @@ PORT ?= 3000
 CONFIG_PATH := ./config.yaml
 DATA_PATH := ./data
 
-# Private registry (override: make push-repository DOCKER_REGISTRY=repository.lan:5000)
-DOCKER_REGISTRY ?= repository.lan
+# Private registry (override: make push-registry DOCKER_REGISTRY=registry.lan:5000)
+DOCKER_REGISTRY ?= registry.lan
 IMAGE_FQN := $(DOCKER_REGISTRY)/$(IMAGE_NAME)
 
 GREEN := \033[0;32m
 YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m
+
+# Cross-build outputs
+DIST_DIR := ./dist
+ARM64_BIN := $(DIST_DIR)/dms-linux-arm64
 
 ##@ General
 
@@ -51,6 +55,41 @@ docker-build: ## Build Docker image
 	@echo "$(YELLOW)Building Docker image $(IMAGE_NAME):$(IMAGE_TAG)...$(NC)"
 	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
 	@echo "$(GREEN)Docker image $(IMAGE_NAME):$(IMAGE_TAG) built successfully!$(NC)"
+
+.PHONY: build-arm64
+build-arm64: ## Cross-compile linux/arm64 binary into ./dist (prefers zigbuild; falls back to cross)
+	@mkdir -p $(DIST_DIR)
+	rustup target add aarch64-unknown-linux-gnu
+	@if command -v zig >/dev/null 2>&1; then \
+		echo "$(YELLOW)Using zigbuild (zig found).$(NC)"; \
+		cargo zigbuild --locked --release --target aarch64-unknown-linux-gnu; \
+	else \
+		echo "$(YELLOW)zig not found; falling back to cross (Docker-based).$(NC)"; \
+		cargo install --locked cross >/dev/null 2>&1 || true; \
+		cross build --locked --release --target aarch64-unknown-linux-gnu; \
+	fi
+	cp -f target/aarch64-unknown-linux-gnu/release/dms $(ARM64_BIN)
+	@echo "$(GREEN)Built $(ARM64_BIN)$(NC)"
+
+.PHONY: docker-build-arm64
+docker-build-arm64: build-arm64 ## Build linux/arm64 image (fast: no emulated Rust compile)
+	@echo "$(YELLOW)Building ARM64 Docker image $(IMAGE_NAME):$(IMAGE_TAG)-arm64...$(NC)"
+	docker buildx build \
+		--platform linux/arm64 \
+		-f Dockerfile.runtime \
+		--build-arg BIN_PATH=$(ARM64_BIN) \
+		-t $(IMAGE_NAME):$(IMAGE_TAG)-arm64 \
+		--load \
+		.
+	@echo "$(GREEN)Docker image $(IMAGE_NAME):$(IMAGE_TAG)-arm64 built successfully!$(NC)"
+
+.PHONY: push-registry-arm64
+push-registry-arm64: docker-build-arm64 ## Tag and push ARM64 image to registry (DOCKER_REGISTRY=…)
+	@echo "$(YELLOW)Tagging $(IMAGE_NAME):$(IMAGE_TAG)-arm64 -> $(IMAGE_FQN):$(IMAGE_TAG)-arm64$(NC)"
+	docker tag $(IMAGE_NAME):$(IMAGE_TAG)-arm64 $(IMAGE_FQN):$(IMAGE_TAG)-arm64
+	@echo "$(YELLOW)Pushing $(IMAGE_FQN):$(IMAGE_TAG)-arm64 (docker login $(DOCKER_REGISTRY) if needed)...$(NC)"
+	docker push $(IMAGE_FQN):$(IMAGE_TAG)-arm64
+	@echo "$(GREEN)Pushed $(IMAGE_FQN):$(IMAGE_TAG)-arm64$(NC)"
 
 .PHONY: push-registry
 push-registry: docker-build ## Tag and push image to registry.lan (DOCKER_REGISTRY=…)

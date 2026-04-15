@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+#
+# Runtime-only image. Expects a prebuilt `dms` binary for the target arch.
+# Build with e.g.:
+#   docker buildx build --platform linux/arm64 -f Dockerfile.runtime --build-arg BIN_PATH=dist/dms-linux-arm64 -t deadmannotifier:arm64 --load .
+
+FROM debian:bookworm-slim AS runtime
+
+# Keep parity with the existing image: TLS roots + curl for HEALTHCHECK, plus a non-root user.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ARG BIN_PATH=dist/dms
+COPY ${BIN_PATH} /usr/local/bin/dms
+
+COPY run.sh /app/run.sh
+COPY config.yaml /app/config.yaml
+
+RUN addgroup --system --gid 1001 deadman \
+    && adduser --system --uid 1001 --ingroup deadman deadman \
+    && chmod +x /app/run.sh \
+    && chown -R deadman:deadman /app
+
+USER deadman
+EXPOSE 3000
+
+ENV RUST_LOG=info
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:3000/health >/dev/null || exit 1
+
+CMD ["/app/run.sh"]

@@ -1,6 +1,6 @@
 [package]
 name = "deadmannotifier"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Dead Man Notifier — service health pings and email reports"
 license = "MIT"
@@ -46,7 +46,7 @@ tokio = { version = "1", features = [
 ] }
 tokio-cron-scheduler = "0.13"
 tower = "0.5"
-tower-http = { version = "0.6", features = ["trace"] }
+tower-http = { version = "0.6", features = ["trace", "set-header"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2"

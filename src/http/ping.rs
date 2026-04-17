@@ -73,6 +73,8 @@ async fn handle_ping(
             .into_response();
     };
 
+    let request_bytes = body.len() as u64;
+
     let logs = if body.is_empty() {
         None
     } else {
@@ -93,6 +95,8 @@ async fn handle_ping(
             StatusCode::OK,
             axum::Json(json!({
                 "success": true,
+                "status": ping_state.as_str(),
+                "bytes": request_bytes,
                 "service": service_name,
                 "state": ping_state.as_str(),
                 "timestamp": chrono::Utc::now().to_rfc3339(),

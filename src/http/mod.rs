@@ -6,12 +6,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::MatchedPath;
+use axum::http::header::CONTENT_LENGTH;
+use axum::http::header::SERVER;
+use axum::http::HeaderMap;
+use axum::http::HeaderValue;
+use axum::http::Method;
+use axum::http::Uri;
 use axum::routing::{get, put};
 use axum::Router;
-use axum::http::header::CONTENT_LENGTH;
-use axum::http::HeaderMap;
+use serde_json::json;
 use tokio::sync::RwLock;
 use tower_http::classify::{ServerErrorsAsFailures, SharedClassifier};
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, info_span, Span};
 
@@ -40,9 +46,17 @@ pub fn build_router(state: HttpState) -> Router {
         .route("/status/group/{group}", get(status_dashboard_group))
         .route("/status/day/{day}", get(status_day_all))
         .route("/status", get(status_dashboard))
-        .route("/{id}/ok", put(handle_ping_ok).fallback(method_not_allowed_json))
-        .route("/{id}/nok", put(handle_ping_nok).fallback(method_not_allowed_json))
+        .route(
+            "/{id}/ok",
+            put(handle_ping_ok).fallback(method_not_allowed_json),
+        )
+        .route(
+            "/{id}/nok",
+            put(handle_ping_nok).fallback(method_not_allowed_json),
+        )
+        .fallback(not_found_json)
         .with_state(state)
+        .layer(server_header_layer())
         .layer(http_trace_layer())
 }
 
@@ -51,6 +65,17 @@ async fn health() -> axum::Json<serde_json::Value> {
         "status": "ok",
         "timestamp": chrono::Utc::now().to_rfc3339(),
     }))
+}
+
+async fn not_found_json(method: Method, uri: Uri) -> impl axum::response::IntoResponse {
+    (
+        axum::http::StatusCode::NOT_FOUND,
+        axum::Json(json!({
+            "error": "Not found",
+            "method": method.to_string(),
+            "path": uri.path(),
+        })),
+    )
 }
 
 fn client_ip(headers: &HeaderMap) -> &str {
@@ -72,6 +97,13 @@ fn content_length(headers: &HeaderMap) -> u64 {
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(0)
+}
+
+fn server_header_layer() -> SetResponseHeaderLayer<HeaderValue> {
+    SetResponseHeaderLayer::overriding(
+        SERVER,
+        HeaderValue::from_static(concat!("deadmannotify ", env!("CARGO_PKG_VERSION"))),
+    )
 }
 
 fn http_trace_layer() -> TraceLayer<
@@ -99,17 +131,19 @@ fn http_trace_layer() -> TraceLayer<
                 client_ip = %client_ip(req.headers()),
             )
         })
-        .on_response(|res: &axum::http::Response<_>, latency: Duration, span: &Span| {
-            let status = res.status().as_u16();
-            let bytes = content_length(res.headers());
-            let latency_ms = latency.as_secs_f64() * 1000.0;
+        .on_response(
+            |res: &axum::http::Response<_>, latency: Duration, span: &Span| {
+                let status = res.status().as_u16();
+                let bytes = content_length(res.headers());
+                let latency_ms = latency.as_secs_f64() * 1000.0;
 
-            info!(
-                parent: span,
-                status = status,
-                latency_ms = latency_ms,
-                response_bytes = bytes,
-                "request completed"
-            );
-        })
+                info!(
+                    parent: span,
+                    status = status,
+                    latency_ms = latency_ms,
+                    response_bytes = bytes,
+                    "request completed"
+                );
+            },
+        )
 }

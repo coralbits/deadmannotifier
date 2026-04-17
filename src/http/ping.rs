@@ -1,5 +1,6 @@
 use axum::body::Bytes;
 use axum::http::HeaderMap;
+use axum::http::Method;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use serde_json::json;
@@ -8,6 +9,18 @@ use crate::domain::ServiceState;
 use crate::error::Error;
 
 use super::HttpState;
+
+pub async fn method_not_allowed_json(method: Method) -> impl IntoResponse {
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        axum::Json(json!({
+            "error": "Method not allowed",
+            "message": format!("This endpoint requires PUT (you sent {method})"),
+            "expected": "PUT",
+            "got": method.to_string(),
+        })),
+    )
+}
 
 pub async fn handle_ping_ok(
     axum::extract::State(state): axum::extract::State<HttpState>,

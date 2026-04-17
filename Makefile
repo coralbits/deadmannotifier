@@ -2,7 +2,9 @@
 .DEFAULT_GOAL := help
 
 IMAGE_NAME := deadmannotifier
-IMAGE_TAG := latest
+VERSION := $(shell cargo metadata --no-deps --format-version 1 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["packages"][0]["version"])')
+# Default docker image tag is the Cargo package version (override: make docker-build IMAGE_TAG=latest)
+IMAGE_TAG ?= $(VERSION)
 CONTAINER_NAME := deadman-notifier
 # Host port published to container 3000 (override: make docker-run PORT=3005)
 PORT ?= 3000

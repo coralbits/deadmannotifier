@@ -532,11 +532,19 @@ fn overview_heatmap(
     let from = range_start.format("%Y-%m-%d").to_string();
     let to = range_end.format("%Y-%m-%d").to_string();
     let events = store.get_events_between_calendar_days(&from, &to, None)?;
-    let worst = heatmap::worst_state_by_day(&events);
     let names = service_name_map(config);
-    let tips = heatmap::build_overview_day_tips(&events, &names, range_start, range_end, &worst);
+    let expected: Vec<String> = config.services.iter().map(|s| s.id.clone()).collect();
+    let deadman = heatmap::deadman_state_by_day(&events, &expected, range_start, range_end);
+    let tips = heatmap::build_overview_day_tips(
+        &events,
+        &names,
+        &expected,
+        range_start,
+        range_end,
+        &deadman,
+    );
     Ok(heatmap::build_heatmap_grid(
-        &worst,
+        &deadman,
         range_start,
         range_end,
         |d| format!("/status/day/{}", d.format("%Y-%m-%d")),
@@ -558,12 +566,20 @@ fn overview_heatmap_for_service_set(
     let from = range_start.format("%Y-%m-%d").to_string();
     let to = range_end.format("%Y-%m-%d").to_string();
     let events = store.get_events_between_calendar_days_for_services(&from, &to, service_ids)?;
-    let worst = heatmap::worst_state_by_day(&events);
     let names = service_name_map(config);
-    let tips = heatmap::build_overview_day_tips(&events, &names, range_start, range_end, &worst);
+    let expected: Vec<String> = service_ids.to_vec();
+    let deadman = heatmap::deadman_state_by_day(&events, &expected, range_start, range_end);
+    let tips = heatmap::build_overview_day_tips(
+        &events,
+        &names,
+        &expected,
+        range_start,
+        range_end,
+        &deadman,
+    );
     let enc = encoded_group.to_string();
     Ok(heatmap::build_heatmap_grid(
-        &worst,
+        &deadman,
         range_start,
         range_end,
         move |d| format!("/status/group/{}/day/{}", enc, d.format("%Y-%m-%d")),
@@ -580,15 +596,16 @@ fn service_heatmap(store: &Store, service_id: &str) -> crate::error::Result<heat
     let from = range_start.format("%Y-%m-%d").to_string();
     let to = range_end.format("%Y-%m-%d").to_string();
     let events = store.get_events_between_calendar_days(&from, &to, Some(service_id))?;
-    let worst = heatmap::worst_state_by_day(&events);
-    let worst_owned = worst.clone();
+    let expected = vec![service_id.to_string()];
+    let deadman = heatmap::deadman_state_by_day(&events, &expected, range_start, range_end);
+    let deadman_owned = deadman.clone();
     let sid = service_id.to_string();
     Ok(heatmap::build_heatmap_grid(
-        &worst,
+        &deadman,
         range_start,
         range_end,
         move |d| format!("/status/service/{}/day/{}", sid, d.format("%Y-%m-%d")),
-        move |d| heatmap::service_day_tip(d, worst_owned.get(&d).copied()),
+        move |d| heatmap::service_day_tip(d, deadman_owned.get(&d).copied()),
     ))
 }
 

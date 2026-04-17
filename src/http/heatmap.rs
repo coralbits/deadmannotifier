@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap};
 use chrono::{Datelike, Duration, NaiveDate, Utc};
 
 use crate::db::EventRow;
-use crate::domain::{worst_state, ServiceState};
+use crate::domain::ServiceState;
 
 /// GitHub-style span: inclusive `start`..=inclusive `end`, grid padded to full weeks (Mon–Sun).
 pub const HEATMAP_DAYS: i64 = 365;
@@ -18,22 +18,66 @@ pub fn sunday_on_or_after(d: NaiveDate) -> NaiveDate {
     d + Duration::days(i64::from(6 - n))
 }
 
-/// Worst state per calendar day (UTC date of `timestamp` string) from ping events.
-pub fn worst_state_by_day(events: &[EventRow]) -> HashMap<NaiveDate, ServiceState> {
-    let mut by_day: HashMap<NaiveDate, Vec<ServiceState>> = HashMap::new();
+/// Deadman semantics for the dashboard heatmap.
+///
+/// For each calendar day in `[range_start, range_end]` (inclusive), the day is **OK** only if
+/// **every** service in `expected_service_ids` has at least one ping event on that day.
+///
+/// Day-level state ordering:
+/// - **NAK**: any expected service is missing (no events that day), or any event is `nak`
+/// - **NOK**: otherwise, any event is `nok`
+/// - **OK**: otherwise (all expected services pinged and all events are `ok`)
+pub fn deadman_state_by_day(
+    events: &[EventRow],
+    expected_service_ids: &[String],
+    range_start: NaiveDate,
+    range_end: NaiveDate,
+) -> HashMap<NaiveDate, ServiceState> {
+    let expected: BTreeSet<&str> = expected_service_ids.iter().map(|s| s.as_str()).collect();
+    let mut seen_by_day: HashMap<NaiveDate, BTreeSet<&str>> = HashMap::new();
+    let mut worst_seen_by_day: HashMap<NaiveDate, ServiceState> = HashMap::new();
     for ev in events {
+        if !expected.contains(ev.service_id.as_str()) {
+            continue;
+        }
         let Some(day) = event_naive_date(ev) else {
             continue;
         };
         let Some(st) = ServiceState::parse(ev.state.as_str()) else {
             continue;
         };
-        by_day.entry(day).or_default().push(st);
+        seen_by_day.entry(day).or_default().insert(ev.service_id.as_str());
+        worst_seen_by_day
+            .entry(day)
+            .and_modify(|cur| {
+                *cur = match (*cur, st) {
+                    (ServiceState::Nak, _) => ServiceState::Nak,
+                    (_, ServiceState::Nak) => ServiceState::Nak,
+                    (ServiceState::Nok, _) => ServiceState::Nok,
+                    (_, ServiceState::Nok) => ServiceState::Nok,
+                    _ => ServiceState::Ok,
+                };
+            })
+            .or_insert(st);
     }
-    by_day
-        .into_iter()
-        .map(|(d, states)| (d, worst_state(states.into_iter())))
-        .collect()
+
+    let mut out: HashMap<NaiveDate, ServiceState> = HashMap::new();
+    let mut d = range_start;
+    loop {
+        let seen = seen_by_day.get(&d).map(|s| s.len()).unwrap_or(0);
+        let any_missing = !expected.is_empty() && seen != expected.len();
+        let state = if any_missing {
+            ServiceState::Nak
+        } else {
+            worst_seen_by_day.get(&d).copied().unwrap_or(ServiceState::Nak)
+        };
+        out.insert(d, state);
+        if d == range_end {
+            break;
+        }
+        d = d.succ_opt().expect("valid date");
+    }
+    out
 }
 
 fn event_naive_date(ev: &EventRow) -> Option<NaiveDate> {
@@ -107,19 +151,26 @@ const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 pub fn build_overview_day_tips(
     events: &[EventRow],
     service_names: &HashMap<String, String>,
+    expected_service_ids: &[String],
     range_start: NaiveDate,
     range_end: NaiveDate,
-    worst_by_day: &HashMap<NaiveDate, ServiceState>,
+    deadman_by_day: &HashMap<NaiveDate, ServiceState>,
 ) -> HashMap<NaiveDate, HeatmapDayTip> {
+    let expected: BTreeSet<&str> = expected_service_ids.iter().map(|s| s.as_str()).collect();
+    let mut seen_by: HashMap<NaiveDate, BTreeSet<&str>> = HashMap::new();
     let mut nok_by: HashMap<NaiveDate, BTreeSet<String>> = HashMap::new();
     let mut nak_by: HashMap<NaiveDate, BTreeSet<String>> = HashMap::new();
     for ev in events {
+        if !expected.contains(ev.service_id.as_str()) {
+            continue;
+        }
         let Some(day) = event_naive_date(ev) else {
             continue;
         };
         let Some(st) = ServiceState::parse(ev.state.as_str()) else {
             continue;
         };
+        seen_by.entry(day).or_default().insert(ev.service_id.as_str());
         let name = service_names
             .get(&ev.service_id)
             .cloned()
@@ -139,6 +190,17 @@ pub fn build_overview_day_tips(
     let mut d = range_start;
     loop {
         let date_disp = d.format("%Y-%m-%d (%A)").to_string();
+        let seen = seen_by.get(&d);
+        let missing: Vec<String> = expected
+            .iter()
+            .filter(|sid| seen.map(|s| !s.contains(*sid)).unwrap_or(true))
+            .map(|sid| {
+                service_names
+                    .get(*sid)
+                    .cloned()
+                    .unwrap_or_else(|| (*sid).to_string())
+            })
+            .collect();
         let nok = nok_by.get(&d);
         let nak = nak_by.get(&d);
         let mut listed = false;
@@ -147,6 +209,19 @@ pub fn build_overview_day_tips(
         html.push_str(&escape_html(&date_disp));
         html.push_str("</div>");
 
+        if !missing.is_empty() {
+            listed = true;
+            let joined = missing
+                .iter()
+                .map(|n| escape_html(n))
+                .collect::<Vec<_>>()
+                .join(", ");
+            html.push_str(
+                r#"<div class="tip-line tip-nak"><span class="tip-k">Missing</span> "#,
+            );
+            html.push_str(&joined);
+            html.push_str("</div>");
+        }
         if let Some(s) = nok {
             if !s.is_empty() {
                 listed = true;
@@ -174,11 +249,11 @@ pub fn build_overview_day_tips(
             }
         }
         if !listed {
-            let msg = match worst_by_day.get(&d) {
-                None => "No pings this day.",
-                Some(ServiceState::Ok) => "No NOK or NAK; all OK.",
+            let msg = match deadman_by_day.get(&d) {
+                None => "No data.",
+                Some(ServiceState::Ok) => "All services ACKed (OK).",
                 Some(ServiceState::Nok) => "NOK.",
-                Some(ServiceState::Nak) => "NAK.",
+                Some(ServiceState::Nak) => "One or more services missing ACK (NAK).",
             };
             html.push_str(r#"<div class="tip-line tip-muted">"#);
             html.push_str(&escape_html(msg));
@@ -187,6 +262,10 @@ pub fn build_overview_day_tips(
         html.push_str("</div>");
 
         let mut aria = date_disp.clone();
+        if !missing.is_empty() {
+            aria.push_str(". Missing: ");
+            aria.push_str(&missing.join(", "));
+        }
         if let Some(s) = nok {
             if !s.is_empty() {
                 aria.push_str(". NOK: ");
@@ -200,11 +279,11 @@ pub fn build_overview_day_tips(
             }
         }
         if !listed {
-            let msg = match worst_by_day.get(&d) {
-                None => "No pings this day.",
-                Some(ServiceState::Ok) => "No NOK or NAK; all OK.",
+            let msg = match deadman_by_day.get(&d) {
+                None => "No data.",
+                Some(ServiceState::Ok) => "All services reported OK.",
                 Some(ServiceState::Nok) => "NOK.",
-                Some(ServiceState::Nak) => "NAK.",
+                Some(ServiceState::Nak) => "Missing service(s) and/or NAK.",
             };
             aria.push_str(". ");
             aria.push_str(msg);
@@ -342,7 +421,7 @@ pub fn tip_fallback(day: NaiveDate) -> HeatmapDayTip {
 pub fn service_day_tip(day: NaiveDate, worst: Option<ServiceState>) -> HeatmapDayTip {
     let date_disp = day.format("%Y-%m-%d (%A)").to_string();
     let (msg, cls) = match worst {
-        None => ("No pings this day.", "tip-muted"),
+        None => ("Missing ACK (NAK).", "tip-nak"),
         Some(ServiceState::Ok) => ("OK.", "tip-ok"),
         Some(ServiceState::Nok) => ("NOK.", "tip-nok"),
         Some(ServiceState::Nak) => ("NAK.", "tip-nak"),

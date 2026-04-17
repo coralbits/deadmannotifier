@@ -35,6 +35,16 @@ Marker row: `events.service_id = 'cron-job-marker'`, `logs = 'CRON_JOB_MARKER'`,
 
 `GET /` and `GET /status` read **`status_ui` from `HttpState.config` (`Arc<RwLock<AppConfig>>`)** on every request. With `serve --watch`, after a successful file reload, updated **username/password** and **enabling or disabling** the block apply without restarting the process.
 
+## Heatmap semantics (deadman invariant)
+
+The dashboard heatmap is a **deadman** indicator, not “worst event of the day”.
+
+- A calendar day (UTC) is **NAK** if any expected service is **missing** (no ping events that day), or if any service reported `nak`.
+- Otherwise, the day is **NOK** if any service reported `nok`.
+- Otherwise, the day is **OK**.
+
+This invariant is implemented in `src/http/heatmap.rs` (`deadman_state_by_day`) and must be preserved if the dashboard/heatmap logic changes.
+
 ## CLI vs old Node
 
 - Host short flag is **`-H`** (not `-h`), because `-h` is help.

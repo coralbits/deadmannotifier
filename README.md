@@ -63,6 +63,16 @@ Full field reference: [docs/CONFIG.md](docs/CONFIG.md).
 
 When **`status_ui`** is configured with both **`username`** and **`password`**, the HTTP server exposes a small **HTML dashboard** (monospace, high-contrast layout) that lists every configured service with its current state, last update time, and a one-line preview of the latest stored log. It also shows a **365-day activity heatmap** (GitHub-style grid: one row per weekday from Monday to Sunday). White cells mean no pings that day; green / yellow / red are the worst state seen that day across pings (**ok** / **nok** / **nak**). Click a cell to open **all log events for that calendar day**; click a service name to see the same heatmap **for that service only**, with cells linking to that service’s day log view.
 
+### Deadman heatmap semantics (important)
+
+The dashboard heatmap follows **deadman** rules. For each calendar day (UTC):
+
+- **NAK (red)**: if **any configured service is missing** (no ping events at all that day), or if any service reported `nak`
+- **NOK (yellow)**: otherwise, if **any** service reported `nok`
+- **OK (green)**: otherwise (all configured services pinged, and all pings were `ok`)
+
+This is intentional: the heatmap answers “did every job check in today?” and surfaces failures even when other jobs are fine.
+
 **URLs and auth**
 
 1. Open **`http://<host>:<port>/`** in a browser (same host/port as `server` in YAML, or your reverse proxy).
